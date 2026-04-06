@@ -1,3 +1,7 @@
 python-backend/.env
 extraction-output
 sample-documents
+sample-images
+api_uploads
+__pycache__tasks_db.json
+
