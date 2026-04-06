@@ -37,7 +37,8 @@ export default function PreviewPage() {
     
     // Hit the /api/process endpoint to trigger background AI processing
     try {
-      const res = await fetch(`http://localhost:8000/api/process/${taskId}`, {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${API_BASE_URL}/api/process/${taskId}`, {
         method: "POST"
       });
       if (!res.ok) throw new Error("Failed to start processing");
@@ -109,7 +110,7 @@ export default function PreviewPage() {
               >
                 {slide.thumbnail_url ? (
                    <img 
-                     src={`http://localhost:8000${slide.thumbnail_url}`} 
+                     src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${slide.thumbnail_url}`} 
                      alt={`Slide ${slide.slide_number}`} 
                      style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }} 
                    />
@@ -155,7 +156,7 @@ export default function PreviewPage() {
             <div className="bg-light rounded d-flex align-items-center justify-content-center border overflow-hidden" style={{ height: "400px", marginBottom: "20px" }}>
               {selectedSlide.thumbnail_url ? (
                    <img 
-                     src={`http://localhost:8000${selectedSlide.thumbnail_url}`} 
+                     src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${selectedSlide.thumbnail_url}`} 
                      alt={`Slide ${selectedSlide.slide_number}`} 
                      style={{ width: "100%", height: "100%", objectFit: "contain" }} 
                    />

@@ -40,7 +40,8 @@ export default function ReviewPage() {
 
     for (let attempt = 1; attempt <= MAX_AUTO_RETRIES; attempt++) {
       try {
-        const res = await fetch(`http://localhost:8000/api/prepare-preview/${tid}`);
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const res = await fetch(`${API_BASE_URL}/api/prepare-preview/${tid}`);
         if (!res.ok) {
           const body = await res.text().catch(() => "");
           throw new Error(`Server returned ${res.status}${body ? `: ${body}` : ""}`);
@@ -103,16 +104,18 @@ export default function ReviewPage() {
   // ── Download Handlers ──
   const handleDownloadDocx = () => {
     if (!taskId) return;
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     window.open(
-      `http://localhost:8000/api/download/${taskId}?filename=${encodeURIComponent(docName)}`,
+      `${API_BASE_URL}/api/download/${taskId}?filename=${encodeURIComponent(docName)}`,
       "_blank"
     );
   };
 
   const handleDownloadPdf = () => {
     if (!taskId) return;
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     window.open(
-      `http://localhost:8000/api/download-pdf/${taskId}?filename=${encodeURIComponent(docName)}`,
+      `${API_BASE_URL}/api/download-pdf/${taskId}?filename=${encodeURIComponent(docName)}`,
       "_blank"
     );
   };
@@ -284,7 +287,7 @@ export default function ReviewPage() {
                 style={{ width: "100%" }}
               >
                 <img
-                  src={`http://localhost:8000${url}`}
+                  src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${url}`}
                   alt={`Page ${idx + 1}`}
                   style={{ width: "100%", display: "block" }}
                 />
