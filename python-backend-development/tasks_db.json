@@ -5919,5 +5919,417 @@
         ],
         "result_pdf": "C:\\Users\\MuhammadIdzhansKhair\\OneDrive - ENFRASYS\\Documents\\project-internal\\design-document-converter\\python-backend\\api_uploads\\97982cb1-59bd-4b67-8398-ba24176dfd79\\Solution_Design_Document.pdf",
         "preview_prepared": true
+    },
+    "6fd45f91-1c60-44a2-8a84-4da4a20bbbca": {
+        "status": "failed",
+        "step_name": "Failed",
+        "progress": 0,
+        "filename": "UMS_PowerBI_Fabric_Design_Workshop_v1.1_final.pptx",
+        "file_path": "C:\\Users\\MuhammadIdzhansKhair\\OneDrive - ENFRASYS\\Documents\\project-internal\\design-document-converter\\python-backend\\api_uploads\\6fd45f91-1c60-44a2-8a84-4da4a20bbbca\\source_UMS_PowerBI_Fabric_Design_Workshop_v1.1_final.pptx",
+        "logo_path": "C:\\Users\\MuhammadIdzhansKhair\\OneDrive - ENFRASYS\\Documents\\project-internal\\design-document-converter\\python-backend\\api_uploads\\6fd45f91-1c60-44a2-8a84-4da4a20bbbca\\logo_ums-logo.png",
+        "preview_data": {
+            "filename": "source_UMS_PowerBI_Fabric_Design_Workshop_v1.1_final.pptx",
+            "total_slides": 27,
+            "diagrams_detected": 5,
+            "slides": [
+                {
+                    "slide_number": 1,
+                    "title": "UMS\u000b Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_1.jpg"
+                },
+                {
+                    "slide_number": 2,
+                    "title": "Agenda",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_2.jpg"
+                },
+                {
+                    "slide_number": 3,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_3.jpg"
+                },
+                {
+                    "slide_number": 4,
+                    "title": "Objective",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_4.jpg"
+                },
+                {
+                    "slide_number": 5,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_5.jpg"
+                },
+                {
+                    "slide_number": 6,
+                    "title": "Slide 6",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_6.jpg"
+                },
+                {
+                    "slide_number": 7,
+                    "title": "Slide 7",
+                    "notes": "There will be some limitations to implement private link, so we opted out for this for future implementation (CA)\n\nExplain the reasoning\n\nThen go through the table:\n\nAdditional license should be purchased for CA\nMicrosoft Entra ID Free, P1, P2\nWe can visit this later, if want to proceed further\nWe will enforce MFA \n\n\n\nNot p1 or p2\n\nThis suggestion will be for later, further purposes",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_7.jpg"
+                },
+                {
+                    "slide_number": 8,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_8.jpg"
+                },
+                {
+                    "slide_number": 9,
+                    "title": "Data Workflow Design",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_9.jpg"
+                },
+                {
+                    "slide_number": 10,
+                    "title": "Data Workflow Design Consideration",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_10.jpg"
+                },
+                {
+                    "slide_number": 11,
+                    "title": "Data Gateway Design",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_11.jpg"
+                },
+                {
+                    "slide_number": 12,
+                    "title": "VM Size Consideration",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_12.jpg"
+                },
+                {
+                    "slide_number": 13,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_13.jpg"
+                },
+                {
+                    "slide_number": 14,
+                    "title": "Azure Outbound Security Rules Consideration",
+                    "notes": "defines the outbound network rules required to allow the On-Premises Data Gateway (OPDG) virtual machine (VM) to securely connect to Microsoft Fabric, Power BI, and related Microsoft cloud services. These rules ensure that the gateway can authenticate, communicate, and transfer data through HTTPS in compliance with Azure networking best practices.\n\nRule Name : Allow_OPDG_HTTPS_Services\nPurpose: Enables HTTPS communication from the gateway VM to Microsoft Fabric and Power BI endpoints.\nExplanation: This rule allows outbound TCP traffic on port 443 (HTTPS) from VM Private IP Addresses to essential Microsoft domains, including Fabric, Power BI, and Azure core services (e.g., *.fabric.microsoft.com, *.powerbi.com). It ensures that the gateway can send and receive data securely using SSL/TLS encryption.\n\nRule Name: Allow_OPDG_Authentication\nPurpose: Enables authentication and identity verification with Microsoft Entra ID (formerly Azure AD).\nExplanation: This rule allows outbound HTTPS traffic (TCP port 443) to identity and login domains such as login.microsoftonline.com, aadcdn.msftauth.net, and login.windows.net. It enables user sign-ins, token validation, and secure connection establishment with Microsoft cloud services.\n\nRule Name: Allow_OPDG_Connectivity_Test\nPurpose: Supports network connectivity verification for the OPDG service.\nExplanation: This rule allows outbound HTTP traffic on port 80 (TCP) to *.msftncsi.com, a Microsoft endpoint used for network connectivity status indication and troubleshooting. It ensures the VM can verify external internet access and service availability.",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_14.jpg"
+                },
+                {
+                    "slide_number": 15,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_15.jpg"
+                },
+                {
+                    "slide_number": 16,
+                    "title": "Slide 16",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_16.jpg"
+                },
+                {
+                    "slide_number": 17,
+                    "title": "Slide 17",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_17.jpg"
+                },
+                {
+                    "slide_number": 18,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_18.jpg"
+                },
+                {
+                    "slide_number": 19,
+                    "title": "Naming Convention",
+                    "notes": "Capacity and workspace (tambah)",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_19.jpg"
+                },
+                {
+                    "slide_number": 20,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_20.jpg"
+                },
+                {
+                    "slide_number": 21,
+                    "title": "AutoML Workflow Design",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_21.jpg"
+                },
+                {
+                    "slide_number": 22,
+                    "title": "AutoML Workflow Design Consideration",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_22.jpg"
+                },
+                {
+                    "slide_number": 23,
+                    "title": "Next Action",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_23.jpg"
+                },
+                {
+                    "slide_number": 24,
+                    "title": "Next Action",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_24.jpg"
+                },
+                {
+                    "slide_number": 25,
+                    "title": "Q & A Session",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_25.jpg"
+                },
+                {
+                    "slide_number": 26,
+                    "title": "Slide 26",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_26.jpg"
+                },
+                {
+                    "slide_number": 27,
+                    "title": "Contact Us",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/6fd45f91-1c60-44a2-8a84-4da4a20bbbca/slide_27.jpg"
+                }
+            ]
+        },
+        "error": "[WinError 3] The system cannot find the path specified"
+    },
+    "0aedc5c7-0575-4234-818e-ff3569564f13": {
+        "status": "completed",
+        "step_name": "Ready!",
+        "progress": 100,
+        "filename": "UMS_PowerBI_Fabric_Design_Workshop_v1.1_final.pptx",
+        "file_path": "C:\\Users\\MuhammadIdzhansKhair\\OneDrive - ENFRASYS\\Documents\\project-internal\\design-document-converter\\python-backend-development\\api_uploads\\0aedc5c7-0575-4234-818e-ff3569564f13\\source_UMS_PowerBI_Fabric_Design_Workshop_v1.1_final.pptx",
+        "logo_path": "C:\\Users\\MuhammadIdzhansKhair\\OneDrive - ENFRASYS\\Documents\\project-internal\\design-document-converter\\python-backend-development\\api_uploads\\0aedc5c7-0575-4234-818e-ff3569564f13\\logo_sirim-logo.png",
+        "preview_data": {
+            "filename": "source_UMS_PowerBI_Fabric_Design_Workshop_v1.1_final.pptx",
+            "total_slides": 27,
+            "diagrams_detected": 5,
+            "slides": [
+                {
+                    "slide_number": 1,
+                    "title": "UMS\u000b Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_1.jpg"
+                },
+                {
+                    "slide_number": 2,
+                    "title": "Agenda",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_2.jpg"
+                },
+                {
+                    "slide_number": 3,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_3.jpg"
+                },
+                {
+                    "slide_number": 4,
+                    "title": "Objective",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_4.jpg"
+                },
+                {
+                    "slide_number": 5,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_5.jpg"
+                },
+                {
+                    "slide_number": 6,
+                    "title": "Slide 6",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_6.jpg"
+                },
+                {
+                    "slide_number": 7,
+                    "title": "Slide 7",
+                    "notes": "There will be some limitations to implement private link, so we opted out for this for future implementation (CA)\n\nExplain the reasoning\n\nThen go through the table:\n\nAdditional license should be purchased for CA\nMicrosoft Entra ID Free, P1, P2\nWe can visit this later, if want to proceed further\nWe will enforce MFA \n\n\n\nNot p1 or p2\n\nThis suggestion will be for later, further purposes",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_7.jpg"
+                },
+                {
+                    "slide_number": 8,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_8.jpg"
+                },
+                {
+                    "slide_number": 9,
+                    "title": "Data Workflow Design",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_9.jpg"
+                },
+                {
+                    "slide_number": 10,
+                    "title": "Data Workflow Design Consideration",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_10.jpg"
+                },
+                {
+                    "slide_number": 11,
+                    "title": "Data Gateway Design",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_11.jpg"
+                },
+                {
+                    "slide_number": 12,
+                    "title": "VM Size Consideration",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_12.jpg"
+                },
+                {
+                    "slide_number": 13,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_13.jpg"
+                },
+                {
+                    "slide_number": 14,
+                    "title": "Azure Outbound Security Rules Consideration",
+                    "notes": "defines the outbound network rules required to allow the On-Premises Data Gateway (OPDG) virtual machine (VM) to securely connect to Microsoft Fabric, Power BI, and related Microsoft cloud services. These rules ensure that the gateway can authenticate, communicate, and transfer data through HTTPS in compliance with Azure networking best practices.\n\nRule Name : Allow_OPDG_HTTPS_Services\nPurpose: Enables HTTPS communication from the gateway VM to Microsoft Fabric and Power BI endpoints.\nExplanation: This rule allows outbound TCP traffic on port 443 (HTTPS) from VM Private IP Addresses to essential Microsoft domains, including Fabric, Power BI, and Azure core services (e.g., *.fabric.microsoft.com, *.powerbi.com). It ensures that the gateway can send and receive data securely using SSL/TLS encryption.\n\nRule Name: Allow_OPDG_Authentication\nPurpose: Enables authentication and identity verification with Microsoft Entra ID (formerly Azure AD).\nExplanation: This rule allows outbound HTTPS traffic (TCP port 443) to identity and login domains such as login.microsoftonline.com, aadcdn.msftauth.net, and login.windows.net. It enables user sign-ins, token validation, and secure connection establishment with Microsoft cloud services.\n\nRule Name: Allow_OPDG_Connectivity_Test\nPurpose: Supports network connectivity verification for the OPDG service.\nExplanation: This rule allows outbound HTTP traffic on port 80 (TCP) to *.msftncsi.com, a Microsoft endpoint used for network connectivity status indication and troubleshooting. It ensures the VM can verify external internet access and service availability.",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_14.jpg"
+                },
+                {
+                    "slide_number": 15,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_15.jpg"
+                },
+                {
+                    "slide_number": 16,
+                    "title": "Slide 16",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_16.jpg"
+                },
+                {
+                    "slide_number": 17,
+                    "title": "Slide 17",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_17.jpg"
+                },
+                {
+                    "slide_number": 18,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_18.jpg"
+                },
+                {
+                    "slide_number": 19,
+                    "title": "Naming Convention",
+                    "notes": "Capacity and workspace (tambah)",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_19.jpg"
+                },
+                {
+                    "slide_number": 20,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_20.jpg"
+                },
+                {
+                    "slide_number": 21,
+                    "title": "AutoML Workflow Design",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_21.jpg"
+                },
+                {
+                    "slide_number": 22,
+                    "title": "AutoML Workflow Design Consideration",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_22.jpg"
+                },
+                {
+                    "slide_number": 23,
+                    "title": "Next Action",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_23.jpg"
+                },
+                {
+                    "slide_number": 24,
+                    "title": "Next Action",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_24.jpg"
+                },
+                {
+                    "slide_number": 25,
+                    "title": "Q & A Session",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_25.jpg"
+                },
+                {
+                    "slide_number": 26,
+                    "title": "Slide 26",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_26.jpg"
+                },
+                {
+                    "slide_number": 27,
+                    "title": "Contact Us",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/0aedc5c7-0575-4234-818e-ff3569564f13/slide_27.jpg"
+                }
+            ]
+        },
+        "result_docx": "C:\\Users\\MuhammadIdzhansKhair\\OneDrive - ENFRASYS\\Documents\\project-internal\\design-document-converter\\python-backend-development\\api_uploads\\0aedc5c7-0575-4234-818e-ff3569564f13\\Solution_Design_Document.docx",
+        "markdown_draft": "# UMS Power BI & Fabric Design Review\n\n# 2.0 Executive Summary\n\nThis section provides a concise summary of the project context, document purpose, and target audience for the Universiti Malaysia Sabah (UMS) Power BI & Microsoft Fabric solution design.\n\n## 2.1 Project Overview\n\nUniversiti Malaysia Sabah (UMS) has commissioned Enfrasys Solutions to design an integrated data workflow leveraging Microsoft Fabric and Power BI. The project scope encompasses the establishment of a Fabric workspace, development of end-to-end ETL pipelines, implementation of machine learning processes, and seamless integration with Power BI for business-driven analytics. The objectives are to modernize UMS\u2019s data infrastructure by aligning cloud adoption strategies with Microsoft Fabric\u2019s capabilities, specifically utilizing Fabric Data Factory for data integration and orchestration, Fabric Synapse for advanced analytics and big data processing, and Data Science for machine learning applications.\n\n## 2.2 Document Purpose\n\nThis Solution Design Document is authored by Enfrasys Solutions to formally detail the technical architecture, workflow design, and implementation approach for the UMS Power BI & Microsoft Fabric initiative. The document addresses the agenda items: project objectives, proposed infrastructure design, workflow design, and next actions. Its intent is to provide a comprehensive blueprint for UMS stakeholders to review, approve, and guide the execution of the solution.\n\n## 2.3 Document Audience\n\nThe primary audience for this document includes:\n\n- UMS executive sponsors and project owners\n- UMS IT management and technical teams\n- UMS business analysts and data stakeholders\n- Enfrasys Solutions architects and delivery specialists\n\nEnfrasys Solutions is responsible for the authorship and technical accuracy of this document. Universiti Malaysia Sabah (UMS) is responsible for review, feedback, and formal sign-off.\n\n# 3.0 Microsoft Fabric & Power BI Overview\nThis section outlines the foundational technologies selected for Universiti Malaysia Sabah\u2019s data workflow modernization, focusing on Microsoft Fabric, Power BI, and Entra ID.\n\n## 3.1 Microsoft Fabric\n\nMicrosoft Fabric is an integrated analytics platform that unifies data engineering, data science, data integration, and business intelligence capabilities within a single SaaS environment. Fabric enables organizations to streamline data workflows, from ingestion to transformation and visualization, leveraging a centralized architecture.\n\n**Core Components:**\n- **Data Factory:** Provides robust data integration and orchestration services, enabling ETL pipelines for seamless data ingestion and transformation across hybrid sources.\n- **Synapse:** Delivers advanced analytics and big data processing, supporting scalable data warehousing and real-time analytics for large datasets.\n- **Data Science:** Facilitates machine learning workflows, including model training, deployment, and operationalization, directly within the Fabric workspace.\n- **OneLake:** Acts as a unified data lake storage, ensuring secure, scalable, and consistent data access across all Fabric workloads.\n\n**Key Features:**\n- End-to-end data workflow management\n- Centralized workspace for collaboration\n- Native integration with Microsoft security and compliance frameworks\n- Support for real-time analytics and machine learning\n\n**Relevance to Universiti Malaysia Sabah:**\nEnfrasys Solutions recommends Microsoft Fabric as the backbone for UMS\u2019s data workflow modernization, enabling efficient data ingestion, transformation, and advanced analytics. Enfrasys Solutions is responsible for technology selection, workspace setup, and integration. Universiti Malaysia Sabah shall drive user adoption and operationalize business use cases.\n\n## 3.2 Power BI\n\nPower BI is Microsoft\u2019s enterprise-grade business intelligence platform, designed to deliver rich, interactive data visualizations and actionable analytics. Power BI seamlessly integrates with Microsoft Fabric, allowing users to visualize transformed data and gain insights directly from the Fabric workspace.\n\n**Key Features:**\n- Interactive dashboards and reports\n- Direct integration with Fabric datasets and OneLake\n- Advanced analytics, including AI-powered insights\n- Secure sharing and collaboration within the organization\n\n**Integration with Fabric:**\nPower BI leverages Fabric\u2019s centralized data storage and transformation capabilities, enabling Universiti Malaysia Sabah to visualize, analyze, and share business-aligned analytics efficiently.\n\n**Relevance to Universiti Malaysia Sabah:**\nEnfrasys Solutions is responsible for configuring Power BI integration with Fabric and developing initial dashboards. Universiti Malaysia Sabah shall ensure user adoption, training, and ongoing business intelligence utilization.\n\n## 3.3 Entra ID\n\nMicrosoft Entra ID (formerly Azure Active Directory) is Microsoft\u2019s cloud-based identity and access management service. Entra ID provides secure authentication, authorization, and user management for cloud and on-premises applications.\n\n**Key Features:**\n- Single sign-on (SSO) for Microsoft Fabric and Power BI\n- Role-based access control (RBAC)\n- Multi-factor authentication (MFA)\n- Centralized identity management and audit logging\n\n**Relevance to Universiti Malaysia Sabah:**\nEnfrasys Solutions is responsible for integrating Entra ID with Fabric and Power BI to enforce secure access and role management. Universiti Malaysia Sabah shall manage user onboarding and ensure compliance with organizational security policies.\n\n# 4.0 Network Design and Decision\nThis section outlines the network architecture and connectivity decisions for Universiti Malaysia Sabah (UMS), focusing on secure access and hybrid data integration.\n\n## 4.1 Network Connectivity Overview\nUniversiti Malaysia Sabah (UMS) requires robust, secure connectivity between its on-premises SQL data warehouse, the On-Premises Data Gateway (OPDG), Microsoft Fabric, and Power BI. The network architecture leverages Azure Conditional Access policies to protect cloud resources and ensure only authorized users and workloads can access sensitive data.\n\n![](C:\\Users\\MuhammadIdzhansKhair\\OneDrive - ENFRASYS\\Documents\\project-internal\\design-document-converter\\python-backend-development\\api_uploads\\0aedc5c7-0575-4234-818e-ff3569564f13\\images\\slide_006_img_001.png)\nFigure 1: Conditional Access architecture for UMS Fabric.\n\n![](C:\\Users\\MuhammadIdzhansKhair\\OneDrive - ENFRASYS\\Documents\\project-internal\\design-document-converter\\python-backend-development\\api_uploads\\0aedc5c7-0575-4234-818e-ff3569564f13\\images\\slide_011_img_004.png)\nFigure 2: Data flow between on-premises SQL, OPDG, and UMS Fabric.\n\nThe architecture ensures:\n- External users connect to UMS Fabric via Azure Conditional Access, enforcing identity, device, and network policies.\n- The On-Premises Data Gateway (OPDG) securely bridges the on-premises SQL Server 2017 data warehouse and Microsoft Fabric, enabling bidirectional data flow without opening inbound ports.\n- Data flows from the UMS staging area through OPDG to Microsoft Fabric and Power BI for analytics and reporting.\n\n## 4.2 Microsoft Fabric Data Gateway\n\n### Microsoft Fabric Definition\nMicrosoft Fabric is a unified analytics platform that integrates data engineering, data science, data warehousing, real-time analytics, and business intelligence within a single SaaS environment. It provides secure, scalable, and collaborative capabilities for organizations to manage, analyze, and visualize data across hybrid and cloud environments.\n\n### On-Premises Data Gateway (OPDG) Role\nThe On-Premises Data Gateway (OPDG) is a Microsoft component that facilitates secure data transfer between on-premises data sources and Microsoft cloud services such as Fabric and Power BI. It operates by establishing outbound connections from the internal network, eliminating the need for inbound firewall rules and enhancing security posture.\n\nUMS shall deploy the OPDG agent within a dedicated virtual machine (VM) in the on-premises environment. This gateway acts as the bridge for data integration workflows, enabling Microsoft Fabric and Power BI to access and refresh data from the UMS SQL Server 2017 data warehouse.\n\nEnfrasys Solutions is responsible for the network design, OPDG deployment, and configuration. Universiti Malaysia Sabah is responsible for providing access to the on-premises SQL Server and ensuring the VM hosting OPDG meets the required specifications.\n\n### VM Specifications for OPDG Deployment\n\n| Component         | Specification                                    |\n|-------------------|--------------------------------------------------|\n| Operating System  | Windows 10 (64-bit) or Windows Server 2019 (64-bit) |\n| .NET Framework    | Version 4.8                                      |\n| vCPU              | 8 cores                                          |\n| RAM               | Minimum 8 GB                                     |\n\n## 4.3 Design Decisions\n\n| No. | Design Decision                                                                 | Decision                                                                                  |\n|-----|---------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|\n| 1   | Secure external access to UMS Fabric via Azure Conditional Access                | Enforce identity, device, and location-based policies for all users accessing Fabric       |\n| 2   | Hybrid connectivity between on-premises SQL and Microsoft Fabric                 | Deploy OPDG in a dedicated VM to bridge on-premises SQL with Fabric and Power BI          |\n| 3   | Network ownership and responsibilities                                           | Enfrasys Solutions to design and deploy OPDG; UMS to provide on-premises access           |\n| 4   | VM sizing for OPDG                                                               | Minimum 8 vCPU cores, 8 GB RAM, Windows 10/Server 2019, .NET Framework 4.8               |\n\n## 4.4 Task and Migration Rollout\n\n| Item                   | Activities                                                                                   | Action By              | Status         |\n|------------------------|---------------------------------------------------------------------------------------------|------------------------|---------------|\n| Network Architecture   | Design secure connectivity between on-premises and Microsoft Fabric                         | Enfrasys Solutions     | Pending        |\n| OPDG VM Provisioning   | Provision VM with required specifications for gateway deployment                            | Universiti Malaysia Sabah | Pending     |\n| OPDG Installation      | Install and configure On-Premises Data Gateway agent                                        | Enfrasys Solutions     | Pending        |\n| SQL Access Provision   | Provide network and authentication access to SQL Server for gateway operations              | Universiti Malaysia Sabah | Pending     |\n| Connectivity Testing   | Validate end-to-end data flow from SQL to Fabric and Power BI                               | Enfrasys Solutions     | Pending        |\n\n---\n\n# Appendix\n\n### Introduction/Prerequisites\nMicrosoft Fabric: [https://learn.microsoft.com/en-us/fabric/overview/](https://learn.microsoft.com/en-us/fabric/overview/)\n\nOn-Premises Data Gateway: [https://learn.microsoft.com/en-us/data-integration/gateway/service-gateway-install](https://learn.microsoft.com/en-us/data-integration/gateway/service-gateway-install)\n\nAzure Conditional Access: [https://learn.microsoft.com/en-us/azure/active-directory/conditional-access/overview](https://learn.microsoft.com/en-us/azure/active-directory/conditional-access/overview)\n\n### Limits and Boundaries\nMicrosoft Fabric Limits: [https://learn.microsoft.com/en-us/fabric/service-limits](https://learn.microsoft.com/en-us/fabric/service-limits)\n\nData Gateway Limits: [https://learn.microsoft.com/en-us/data-integration/gateway/service-gateway-limits](https://learn.microsoft.com/en-us/data-integration/gateway/service-gateway-limits)\n\n### Others\nFabric SLA: [https://azure.microsoft.com/en-us/support/legal/sla/fabric/](https://azure.microsoft.com/en-us/support/legal/sla/fabric/)\n\nData Gateway Troubleshooting: [https://learn.microsoft.com/en-us/data-integration/gateway/service-gateway-troubleshoot](https://learn.microsoft.com/en-us/data-integration/gateway/service-gateway-troubleshoot)\n\n# 5.0 Roles in Microsoft Fabric & Power BI\n\nThis section defines the role structure and access model for Universiti Malaysia Sabah (UMS) within Microsoft Fabric and Power BI.\n\n## 5.1 Fabric Administrator Role\n\nMicrosoft Fabric is an end-to-end analytics platform that unifies data engineering, data science, real-time analytics, and business intelligence within a single SaaS solution. Fabric Administrators are responsible for managing platform governance, workspace configuration, access provisioning, and compliance monitoring.\n\nEnfrasys Solutions recommends that Fabric Administrator responsibilities include:\n\n- Creating and managing workspaces\n- Assigning and revoking user roles\n- Monitoring workspace activity and compliance\n- Managing data connectivity and integration\n- Overseeing security and auditing\n\nThe following table outlines workspace-level role capabilities:\n\n| Permission         | Admin | Contributor | Member | Viewer |\n|--------------------|-------|-------------|--------|--------|\n| Manage workspace   | Yes   | No          | No     | No     |\n| Add/remove users   | Yes   | No          | No     | No     |\n| Publish content    | Yes   | Yes         | No     | No     |\n| Edit content       | Yes   | Yes         | Yes    | No     |\n| View content       | Yes   | Yes         | Yes    | Yes    |\n| Delete workspace   | Yes   | No          | No     | No     |\n\n## 5.2 Fabric-native Roles\n\nEnfrasys Solutions provides the following formal definitions and responsibilities for Fabric-native roles:\n\n- **Data Engineer**: Responsible for designing, building, and maintaining data pipelines, datasets, and integration flows within Fabric. Data Engineers ensure data quality, performance, and scalability.\n- **Business User Admin**: Manages business user access, workspace membership, and oversees the operational use of analytics assets by business teams.\n- **Data Analyst**: Consumes, analyzes, and visualizes data using Power BI and Fabric tools. Data Analysts create reports, dashboards, and derive actionable insights.\n- **Stakeholder**: Reviews analytics outputs, provides business context, and validates data-driven recommendations. Stakeholders typically have read-only access.\n- **Project Director**: Oversees project delivery, ensures alignment with business objectives, and provides approval for critical decisions. Project Directors may have view-only or limited contributor access.\n\n## 5.3 UMS Workspace Role and Access\n\nEnfrasys Solutions shall be responsible for mapping workspace roles and provisioning access in Microsoft Fabric and Power BI. Universiti Malaysia Sabah shall assign and manage users for each role, ensuring personnel are kept up to date.\n\n| No. | Workspace Role     | Suggested Role                         | UMS PIC                                                                                                                                   |\n|-----|--------------------|----------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|\n| 1   | Workspace Admin    | Fabric Admin / Data Engineer           | Dr Suraya Binti Alias<br>Sektor Analitik Data DARTIC<br>PPDM Official<br>Mohd. Zamrie Bin Musa<br>Noor Afiza Binti Momen<br>Ts AG Azihar @ AG KU Azihar Bin AG Tangah |\n| 2   | Workspace Contributor | Data Engineer / Business User Admin | Mohd Khairul Nizam Bin Senu (DB)<br>Assie Zaee Petrus (DB)<br>Muhaimin Bin Mad Noor (Infra)<br>Nuraliah Binti Alias (Infra)<br>Chong Tze Chien (Server Security)<br>Abdul Latif Matali (Server Security) |\n| 3   | Workspace Viewer   | Data Analyst / Stakeholder / Project Director | Director<br>Dr Farashazillah Binti Yahya<br>Stakeholders<br>Roslee Bin Talip<br>Dayangku Rozlina BTE PG. Aliuddin<br>Norhanieyati Binti Norhaizat<br>Zaidie @ Mohd Zaidie Bin Adilai<br>Professor Madya TS Dr Mohd Hanafi Bin Ahmad Hijazi |\n\nEnfrasys Solutions will perform initial role mapping and access provisioning. Universiti Malaysia Sabah shall be responsible for ongoing user assignment, management, and periodic review of access rights.\n\n# 6.0 Microsoft Fabric & Power BI Design and Decision\n\nThis section outlines the recommended architecture and operational design for Microsoft Fabric and Power BI deployment for Universiti Malaysia Sabah (UMS).\n\n## 6.1 Data Workflow Design Considerations\n\nMicrosoft Fabric is a unified analytics platform that combines data engineering, data science, real-time analytics, and business intelligence within a single SaaS solution. Power BI is a business analytics service that delivers insights through interactive reports and dashboards, seamlessly integrated with Microsoft Fabric.\n\nThe following table summarizes the data workflow design considerations for UMS:\n\n| ID   | Description                                                                                                            | Workload Type   |\n|------|------------------------------------------------------------------------------------------------------------------------|-----------------|\n| DC01 | Data Pipeline will be used to ingest data from Microsoft SQL Server.                                                   | Data Factory    |\n| DC02 | The Bronze Lakehouse will store raw/original data ingested from Microsoft SQL Server.                                  | Data Engineering|\n| DC03 | The Silver Lakehouse will store cleansed data sourced from the bronze Lakehouse.                                       | Data Engineering|\n| DC04 | The Gold Lakehouse will store transformed data sourced from the silver Lakehouse.                                      | Data Engineering|\n| DC05 | Data cleansing and transformation for the Silver Lakehouse will be performed using Dataflow Gen2, Notebook and Visual Query in the SQL Analytics Endpoint. | Data Engineering|\n| DC06 | Dataflow Gen2 will be used to move data between Lakehouses (e.g., from bronze to silver or silver to gold).            | Data Factory    |\n| DC07 | AutoML from Data Science will be used to demonstrate the Machine Learning Process, and the results will be stored in Gold Lakehouse | Data Science    |\n| DC08 | Data modeling will be implemented in the Semantic Model, using data from the Gold Lakehouse.                           | Power BI        |\n| DC09 | Power BI Desktop will connect to the Semantic Model via OneLake for data visualization.                                | Power BI        |\n| DE01 | The cleaned data stored in Silver Lakehouse will serve as the input for all machine learning experimentation. The chosen data will be one of the programs selected from the overall Staging DB. | Data Engineering|\n| DE02 | The Project will primarily adopt the Manual Machine Learning approach using Fabric Notebooks (PySpark or Python) to enable custom feature engineering, algorithm tuning, and model optimization. | Data Science    |\n| DE03 | Users will perform model training, evaluation, and fine-tuning directly in the Notebook environment to achieve more accurate and explainable results tailored to UMS\u2019s datasets. | Data Science    |\n| DE04 | Trained models will be registered in the Fabric Model Registry to support model lifecycle management, versioning, and potential reuse across further adoption. | Data Science    |\n| DE05 | Scoring Notebooks will be used to apply trained models to new or unseen data. The scored outputs, predictions, probabilities, and performance metrics will be stored in the Gold Lakehouse. | Data Engineering|\n| DE06 | The Gold Lakehouse will serve as the standardized repository for all modeled or scored results, ensuring consistency between AutoML and manual ML outputs. | Data Engineering|\n| DE07 | The Semantic Model will connect to the Gold Lakehouse via Direct Lake (OneLake) and Data Modelling will be implemented | Power BI        |\n| DE08 | Power BI Desktop will connect to the Semantic Model via OneLake for data visualization.                                | Power BI        |\n\n## 6.2 Data Workflow Design Decisions\n\nEnfrasys Solutions recommends a layered data workflow architecture leveraging Microsoft Fabric and Power BI, ensuring data integrity, scalability, and advanced analytics capabilities for UMS.\n\n![](C:\\Users\\MuhammadIdzhansKhair\\OneDrive - ENFRASYS\\Documents\\project-internal\\design-document-converter\\python-backend-development\\api_uploads\\0aedc5c7-0575-4234-818e-ff3569564f13\\images\\slide_009_img_003.png)\nFigure 1: High-level data workflow architecture.\n\n![](C:\\Users\\MuhammadIdzhansKhair\\OneDrive - ENFRASYS\\Documents\\project-internal\\design-document-converter\\python-backend-development\\api_uploads\\0aedc5c7-0575-4234-818e-ff3569564f13\\images\\slide_021_img_005.png)\nFigure 2: Machine learning and AutoML workflow architecture.\n\n| No. | Design Decision                                                                                                   | Decision                                                                                     |\n|-----|-------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|\n| 1   | Data ingestion from Microsoft SQL Server into Bronze Lakehouse via Azure Data Factory.                            | Enfrasys Solutions will implement automated pipelines for ingestion.                         |\n| 2   | Layered Lakehouse architecture (Bronze, Silver, Gold) for data processing and storage.                            | Enfrasys Solutions will configure Lakehouses for each stage of data refinement.              |\n| 3   | Data cleansing and transformation using Dataflow Gen2, Notebook, and Visual Query.                               | Enfrasys Solutions will develop and maintain transformation scripts and flows.               |\n| 4   | Machine learning experimentation using both AutoML and manual notebooks.                                          | Enfrasys Solutions will enable both approaches and register models in Fabric Model Registry. |\n| 5   | Scored outputs and predictions stored in Gold Lakehouse for consistency.                                          | Enfrasys Solutions will standardize output storage and access.                               |\n| 6   | Semantic Model connects to Gold Lakehouse via Direct Lake (OneLake) for Power BI visualization.                   | Enfrasys Solutions will configure semantic models and OneLake integration.                   |\n| 7   | Power BI Desktop connects to Semantic Model for reporting and dashboarding.                                       | Universiti Malaysia Sabah shall use Power BI Desktop for visualization and analytics.         |\n\n## 6.3 Access Design Considerations and Decisions\n\n### Conditional Access\n\nConditional Access in Microsoft Fabric and Power BI is a policy-based security feature in Microsoft Entra ID that enforces access controls based on user, location, device, and risk factors.\n\n### Multi-Factor Authentication (MFA)\n\nMulti-Factor Authentication (MFA) is a security mechanism that requires users to provide two or more verification methods to access Microsoft Fabric and Power BI resources, enhancing protection against unauthorized access.\n\n| No. | Policy                                  | Decision                                                                                  |\n|-----|-----------------------------------------|-------------------------------------------------------------------------------------------|\n| 1   | Require MFA for all administrative and contributor roles. | Enfrasys Solutions will configure MFA enforcement in Entra ID; UMS shall ensure compliance.|\n| 2   | Conditional Access policies for external access and risky sign-ins. | Enfrasys Solutions will define and implement policies; UMS shall monitor and review access.|\n| 3   | Restrict access to Gold Lakehouse and Semantic Model to authorized personnel only. | Enfrasys Solutions will configure access controls; UMS shall manage operational permissions.|\n\n## 6.4 Virtual Machine (VM) Size\n\nThe following VM specifications are recommended for supporting data workflows, machine learning, and Power BI integration within Microsoft Fabric:\n\n| Component          | Specification                  |\n|--------------------|-------------------------------|\n| Data Factory VM    | Standard_D4_v3 (4 vCPU, 16 GB RAM) |\n| Notebook/ML VM     | Standard_D8_v3 (8 vCPU, 32 GB RAM) |\n| Lakehouse Storage  | Azure Data Lake Gen2 (Managed) |\n| Power BI Gateway   | Standard_D2_v3 (2 vCPU, 8 GB RAM)  |\n\nEnfrasys Solutions is responsible for VM sizing and provisioning; Universiti Malaysia Sabah is responsible for monitoring and operational maintenance.\n\n## 6.5 Resource Organization Design\n\n### Management Groups\n\nManagement Groups in Azure provide a hierarchical structure for organizing subscriptions and resources, enabling policy enforcement and governance at scale.\n\nEnfrasys Solutions will establish management groups for UMS\u2019s Fabric, Power BI, and supporting Azure resources.\n\n### Naming and Tagging\n\nConsistent naming and tagging conventions are critical for resource discoverability, lifecycle management, and governance in Microsoft Fabric and Azure.\n\n| Resource          | Abbreviation | Example                          |\n|-------------------|-------------|-----------------------------------|\n| Subscription      | subs         | ums-prod-subs                     |\n| Resource Group    | rg           | ums-data-rg                       |\n| Data Factory      | df           | ums-ingest-df                     |\n| Lakehouse         | lk           | StudentAffairs_Bronze_LK          |\n| Dataflow          | df           | StudentAffairs_Bronze_to_Silver_DF|\n| Semantic Model    | sm           | StudentAffairs_StudentPerformance_SM|\n| Pipeline          | pl           | StudentAffairs_Ingest_Data_PL     |\n| Report            | rpt          | StudentAffairs_StudentPerformance_Report|\n\n| No. | Item in Fabric | Naming <Identity>-<Scenario/Activity>-<FabricItemName>      |\n|-----|---------------|-------------------------------------------------------------|\n| 1   | Fabric Capacity| stagingareadevcapacity01                                    |\n| 2   | Workspace     | StudentAffairs_dev_WS                                       |\n| 3   | Lakehouse     | StudentAffairs_Bronze_LK<br>StudentAffairs_Silver_LK<br>Etc\u2026|\n| 4   | Dataflow      | StudentAffairs_Bronze_to_Silver_DF<br>StudentAffairs_Silver_to_Gold_DF<br>Etc..|\n| 5   | Semantic Model| StudentAffairs_StudentPerformance_SM                        |\n| 6   | Pipeline      | StudentAffairs_Ingest_Data_PL<br>Etc..                      |\n| 7   | Report        | StudentAffairs_StudentPerformance_Report                    |\n\n| Abbreviation | Acronym Meaning                  |\n|--------------|----------------------------------|\n| LK           | Lakehouse                        |\n| DF           | Dataflow                         |\n| SM           | Semantic Model                   |\n| PL           | Pipeline                         |\n| WS           | Workspace                        |\n| RPT          | Report                           |\n\nEnfrasys Solutions will implement and enforce naming and tagging standards; Universiti Malaysia Sabah shall ensure ongoing compliance.\n\n## 6.6 Governance Consideration\n\n### Governance Disciplines\n\nAzure Cost Management tools enable tracking, analysis, and optimization of cloud expenditures, supporting financial governance and accountability.\n\n| Azure Tool         | Description                                 | Cost Management Discipline    |\n|--------------------|---------------------------------------------|------------------------------|\n| Azure Cost Management | Provides cost analysis, budgeting, and alerts | Budgeting, Monitoring        |\n| Azure Advisor      | Offers cost optimization recommendations     | Optimization                 |\n| Azure Policy       | Enforces governance and compliance policies  | Compliance                   |\n| Azure Resource Graph| Enables resource inventory and query        | Inventory, Reporting         |\n\nEnfrasys Solutions will configure governance disciplines and cost management tools; Universiti Malaysia Sabah is responsible for operational governance and compliance.\n\n### Violation Triggers and Actions\n\n| Trigger                             | Action By           | Response Action                                 |\n|--------------------------------------|---------------------|-------------------------------------------------|\n| Unauthorized access attempt          | Enfrasys Solutions  | Immediate policy enforcement, alert UMS          |\n| Resource naming convention violation | Enfrasys Solutions  | Automated remediation, notify UMS                |\n| Budget threshold exceeded            | Universiti Malaysia Sabah | Review usage, approve/deny additional spend      |\n| Policy non-compliance                | Enfrasys Solutions  | Enforce policy, escalate to UMS IT management    |\n\nEnfrasys Solutions is responsible for governance setup, violation detection, and remediation; Universiti Malaysia Sabah is responsible for operational review and compliance.\n\n# 7.0 Security Design and Decision\nThis section outlines the security controls and encryption strategy for Universiti Malaysia Sabah\u2019s Azure-based data platform, including network security group (NSG) rules and encryption standards.\n\n## 7.1 Azure Network Security Group (NSG) Overview\nAzure Network Security Groups (NSGs) are fundamental security components in Microsoft Azure, used to filter inbound and outbound network traffic to Azure resources based on defined rules. NSGs enable granular control over connectivity, helping organizations enforce least-privilege access and secure cloud workloads.\n\nEnfrasys Solutions shall configure all NSG rules, ensuring secure connectivity for the On-Premises Data Gateway (OPDG) VM to Microsoft Fabric, Power BI, and related Microsoft cloud services. Universiti Malaysia Sabah shall monitor NSG activity and respond to any security incidents.\n\n| Name                      | Priority | Source                 | Source Ports | Destination                                                                                                                        | Destination Ports | Protocol | Access |\n|---------------------------|----------|------------------------|--------------|-------------------------------------------------------------------------------------------------------------------------------------|-------------------|----------|--------|\n| Allow_OPDG_HTTPS_Services | 130      | VM Private IP Addresses| *            | *.servicebus.windows.net, *.download.microsoft.com, *.core.windows.net, *.frontend.clouddatahub.net, *.dfs.fabric.microsoft.com, *.datawarehouse.fabric.microsoft.com, *.powerbi.com, *.analysis.windows.net | 443               | TCP      | Allow  |\n| Allow_OPDG_Authentication | 140      | VM Private IP Addresses| *            | *.login.windows.net, login.microsoftonline.com, aadcdn.msauth.net, aadcdn.msftauth.net, *.microsoftonline-p.com, login.live.com      | 443               | TCP      | Allow  |\n| Allow_OPDG_Connectivity_Test | 160   | VM Private IP Addresses| *            | *.msftncsi.com                                                                                                                     | 80                | TCP      | Allow  |\n\n## 7.2 Encryption Design\n\n### SSL/TLS Encryption (Data In Transit)\nSSL/TLS (Secure Sockets Layer/Transport Layer Security) are cryptographic protocols designed to provide secure communication over a network. SSL/TLS encrypts data in transit between client applications, gateway VMs, and Microsoft cloud endpoints, protecting against eavesdropping and man-in-the-middle attacks.\n\nEnfrasys Solutions shall implement SSL/TLS for all communications between the OPDG VM and Microsoft Fabric, Power BI, and related services. Universiti Malaysia Sabah shall monitor certificate validity and report anomalies.\n\n### Data-at-Rest Encryption\nData-at-rest encryption protects stored data from unauthorized access by encrypting it when it is saved to disk. Azure automatically encrypts data at rest using strong encryption algorithms such as AES-256, ensuring compliance with regulatory and organizational requirements.\n\nEnfrasys Solutions shall ensure that all Azure storage accounts, databases, and related resources are configured with data-at-rest encryption. Universiti Malaysia Sabah shall review encryption status and respond to any alerts or incidents.\n\n### Data-in-Transit Encryption\nData-in-transit encryption refers to the protection of data as it moves between systems, devices, or services. Azure enforces encryption for all data transfers between client endpoints and Microsoft services using HTTPS and other secure protocols.\n\nEnfrasys Solutions shall verify that all outbound and inbound data flows utilize encrypted channels. Universiti Malaysia Sabah shall audit traffic patterns and escalate any detected insecure transmissions.\n\n## 7.3 Security Task Assignment\n\n| Item                      | Activities                                                                                   | Action By               | Status     |\n|---------------------------|----------------------------------------------------------------------------------------------|-------------------------|------------|\n| NSG Rule Configuration    | Define, implement, and validate NSG outbound rules for OPDG VM                              | Enfrasys Solutions      | Pending    |\n| Encryption Setup          | Enable SSL/TLS for OPDG VM communications; configure data-at-rest encryption on Azure        | Enfrasys Solutions      | Pending    |\n| Security Monitoring       | Monitor NSG activity, certificate validity, and encryption alerts                           | Universiti Malaysia Sabah| Ongoing    |\n| Incident Response         | Investigate and respond to security incidents or anomalies                                  | Universiti Malaysia Sabah| Ongoing    |\n\n![](./images/slide14_network_topology.png)\nFigure 1: Network topology illustrating OPDG connectivity and outbound security enforcement.\n\n# 8.0 Deployment & Migration Approach\n\nThis section outlines the structured deployment and migration strategy for Universiti Malaysia Sabah (UMS), assigning clear responsibilities and timelines to ensure a successful rollout.\n\n## 8.1 Pre-Migration/Setup\n\nThe pre-migration phase establishes foundational readiness for the migration. Enfrasys Solutions is responsible for technical deployment, while Universiti Malaysia Sabah (UMS) is responsible for environment readiness and acceptance.\n\n| No | Activities                                                        | Planned Start      | Action By         | Status      | Remarks         |\n|----|-------------------------------------------------------------------|--------------------|-------------------|-------------|-----------------|\n| 1  | Deliver Design Document to be reviewed by UMS & Sign Off          | Fri, 7-Nov-25      | Enfrasys / UMS    | Not-Started |                 |\n| 2  | Confirmation on the new server (data warehouse copy \u2013 Staging Area DB) to be ingested | Mon, 10-Nov-25     | UMS               | Not-Started |                 |\n| 3  | Fabric Environment Setup                                          | Wed, 12-Nov-25     | Enfrasys          | Not-Started |                 |\n| 4  | Install On-Premises Data Gateway (OPDG) in VM to establish Data Gateway | Mon, 17-Nov-25     | Enfrasys / UMS    | Not-Started |                 |\n\n## 8.2 Pilot\n\nThe pilot phase involves deploying the solution in a controlled environment to validate migration processes, data integrity, and system functionality. Enfrasys Solutions shall execute the pilot migration and deployment, including configuration and testing of Microsoft Fabric and the On-Premises Data Gateway. Universiti Malaysia Sabah (UMS) shall provide access to pilot data sources, validate migrated data, and formally accept the pilot results. Any issues identified during the pilot will be addressed by Enfrasys Solutions prior to production rollout.\n\n## 8.3 Production\n\nThe production rollout consists of full-scale migration and deployment of all workloads. Enfrasys Solutions is responsible for executing the migration, monitoring system performance, and ensuring operational stability. Universiti Malaysia Sabah (UMS) shall confirm environment readiness, provide acceptance of migrated workloads, and facilitate user access provisioning. Enfrasys Solutions will coordinate with UMS to minimize downtime and ensure seamless transition from pilot to production.\n\n## 8.4 Post-Migration/Support\n\nThe post-migration phase provides ongoing support and validation to ensure system stability and user satisfaction. The timeline is structured as follows:\n\n| Item | Activities                                   | Action By      | Status      | Remarks         |\n|------|----------------------------------------------|--------------- |-------------|-----------------|\n| D-7  | Final pre-migration review and checklist     | Enfrasys       | Pending     |                 |\n| D0   | Migration cutover and production activation  | Enfrasys       | Pending     |                 |\n| D+1  | Post-migration support and feedback session  | Enfrasys / UMS | Pending     | UMS to provide feedback |\n\nEnfrasys Solutions shall provide technical support and monitoring post-migration. Universiti Malaysia Sabah (UMS) shall report any issues and provide feedback for continuous improvement.\n\n# 9.0 Appendix\n\nThis section provides reference links, prerequisites, and boundaries for core technology domains relevant to Universiti Malaysia Sabah\u2019s solution. Enfrasys Solutions recommends Universiti Malaysia Sabah review these resources for ongoing operations and governance.\n\n## 9.1 Appendix 1 Computing\n\n### Introduction/Prerequisites\nAzure Virtual Machines: [https://learn.microsoft.com/en-us/azure/virtual-machines/](https://learn.microsoft.com/en-us/azure/virtual-machines/)\n\nAzure Compute Overview: [https://learn.microsoft.com/en-us/azure/architecture/topics/compute](https://learn.microsoft.com/en-us/azure/architecture/topics/compute)\n\n### Limits and Boundaries\nAzure Subscription Limits: [https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/azure-subscription-service-limits](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/azure-subscription-service-limits)\n\nAzure VM Size Limits: [https://learn.microsoft.com/en-us/azure/virtual-machines/sizes](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes)\n\n### Others\nAzure Compute SLAs: [https://azure.microsoft.com/en-us/support/legal/sla/virtual-machines/](https://azure.microsoft.com/en-us/support/legal/sla/virtual-machines/)\n\nAzure VM Best Practices: [https://learn.microsoft.com/en-us/azure/virtual-machines/windows/best-practices](https://learn.microsoft.com/en-us/azure/virtual-machines/windows/best-practices)\n\n## 9.2 Appendix 2 Network\n\n### Introduction/Prerequisites\nAzure Virtual Network: [https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-overview](https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-overview)\n\nAzure Network Security Groups: [https://learn.microsoft.com/en-us/azure/virtual-network/network-security-groups-overview](https://learn.microsoft.com/en-us/azure/virtual-network/network-security-groups-overview)\n\n### Limits and Boundaries\nAzure Networking Limits: [https://learn.microsoft.com/en-us/azure/virtual-network/virtual-network-limits](https://learn.microsoft.com/en-us/azure/virtual-network/virtual-network-limits)\n\nAzure NSG Rules Limits: [https://learn.microsoft.com/en-us/azure/virtual-network/network-security-groups-overview#limits](https://learn.microsoft.com/en-us/azure/virtual-network/network-security-groups-overview#limits)\n\n### Others\nAzure Networking SLAs: [https://azure.microsoft.com/en-us/support/legal/sla/virtual-network/](https://azure.microsoft.com/en-us/support/legal/sla/virtual-network/)\n\nAzure Network Design Patterns: [https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/networking/](https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/networking/)\n\n## 9.3 Appendix 3 Identity & Security\n\n### Introduction/Prerequisites\nMicrosoft Entra ID (Azure AD): [https://learn.microsoft.com/en-us/azure/active-directory/fundamentals/active-directory-whatis](https://learn.microsoft.com/en-us/azure/active-directory/fundamentals/active-directory-whatis)\n\nAzure Security Center: [https://learn.microsoft.com/en-us/azure/security-center/security-center-introduction](https://learn.microsoft.com/en-us/azure/security-center/security-center-introduction)\n\n### Limits and Boundaries\nEntra ID Service Limits: [https://learn.microsoft.com/en-us/azure/active-directory/enterprise-users/azure-ad-service-limits](https://learn.microsoft.com/en-us/azure/active-directory/enterprise-users/azure-ad-service-limits)\n\nAzure Security Center Limits: [https://learn.microsoft.com/en-us/azure/security-center/security-center-limits](https://learn.microsoft.com/en-us/azure/security-center/security-center-limits)\n\n### Others\nEntra ID SLAs: [https://azure.microsoft.com/en-us/support/legal/sla/active-directory/](https://azure.microsoft.com/en-us/support/legal/sla/active-directory/)\n\nAzure Security Best Practices: [https://learn.microsoft.com/en-us/azure/security/fundamentals/best-practices-and-patterns](https://learn.microsoft.com/en-us/azure/security/fundamentals/best-practices-and-patterns)\n\n## 9.4 Appendix 4 Logging & Monitoring\n\n### Introduction/Prerequisites\nAzure Monitor: [https://learn.microsoft.com/en-us/azure/azure-monitor/overview](https://learn.microsoft.com/en-us/azure/azure-monitor/overview)\n\nAzure Log Analytics: [https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-analytics-overview](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-analytics-overview)\n\n### Limits and Boundaries\nAzure Monitor Limits: [https://learn.microsoft.com/en-us/azure/azure-monitor/monitoring-limits](https://learn.microsoft.com/en-us/azure/azure-monitor/monitoring-limits)\n\nLog Analytics Workspace Limits: [https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-analytics-workspace-limits](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-analytics-workspace-limits)\n\n### Others\nAzure Monitor SLAs: [https://azure.microsoft.com/en-us/support/legal/sla/monitor/](https://azure.microsoft.com/en-us/support/legal/sla/monitor/)\n\nAzure Monitoring Best Practices: [https://learn.microsoft.com/en-us/azure/azure-monitor/best-practices](https://learn.microsoft.com/en-us/azure/azure-monitor/best-practices)\n\n## 9.5 Appendix 5 Cloud Governance\n\n### Introduction/Prerequisites\nAzure Governance Overview: [https://learn.microsoft.com/en-us/azure/governance/](https://learn.microsoft.com/en-us/azure/governance/)\n\nAzure Policy: [https://learn.microsoft.com/en-us/azure/governance/policy/overview](https://learn.microsoft.com/en-us/azure/governance/policy/overview)\n\n### Limits and Boundaries\nAzure Policy Limits: [https://learn.microsoft.com/en-us/azure/governance/policy/concepts#limits](https://learn.microsoft.com/en-us/azure/governance/policy/concepts#limits)\n\nManagement Group Limits: [https://learn.microsoft.com/en-us/azure/governance/management-groups/overview#limits](https://learn.microsoft.com/en-us/azure/governance/management-groups/overview#limits)\n\n### Others\nAzure Governance Best Practices: [https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/govern/](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/govern/)\n\nAzure Management SLAs: [https://azure.microsoft.com/en-us/support/legal/sla/management-groups/](https://azure.microsoft.com/en-us/support/legal/sla/management-groups/)\n\n## 9.6 Appendix 6 Fabric & Power BI-specific\n\n### Introduction/Prerequisites\nMicrosoft Fabric Overview: [https://learn.microsoft.com/en-us/fabric/overview/](https://learn.microsoft.com/en-us/fabric/overview/)\n\nPower BI Documentation: [https://learn.microsoft.com/en-us/power-bi/fundamentals/service-overview](https://learn.microsoft.com/en-us/power-bi/fundamentals/service-overview)\n\n### Limits and Boundaries\nMicrosoft Fabric Limits: [https://learn.microsoft.com/en-us/fabric/limits/](https://learn.microsoft.com/en-us/fabric/limits/)\n\nPower BI Service Limits: [https://learn.microsoft.com/en-us/power-bi/enterprise/service-limits](https://learn.microsoft.com/en-us/power-bi/enterprise/service-limits)\n\n### Others\nPower BI SLAs: [https://azure.microsoft.com/en-us/support/legal/sla/power-bi/](https://azure.microsoft.com/en-us/support/legal/sla/power-bi/)\n\nFabric Best Practices: [https://learn.microsoft.com/en-us/fabric/best-practices/](https://learn.microsoft.com/en-us/fabric/best-practices/)\n\n",
+        "asset_library": [
+            {
+                "filename": "slide_006_img_001.png",
+                "description": "This is a technical architecture diagram.\n\nThe diagram illustrates a system architecture involving the following components and data flow:\n\n1. **Fabric-RG**:  \n   - Represents a resource group in Azure, likely hosting resources related to the \"UMS Fabric.\"  \n   - The resource group acts as a logical container for managing and organizing Azure resources.\n\n2. **UMS Fabric**:  \n   - A service or application hosted within the Fabric-RG.  \n   - It appears to be the core system or platform that external users interact with.\n\n3. **Conditional Access**:  \n   - A security mechanism applied to control access to the UMS Fabric.  \n   - It enforces policies based on conditions such as user identity, device compliance, location, or risk level.\n\n4. **External User**:  \n   - Represents an end-user or client accessing the UMS Fabric.  \n   - Access is mediated through the Conditional Access layer to ensure security.\n\n**Data Flow**:  \n- The arrow indicates a unidirectional flow of access or interaction from the External User to the UMS Fabric.  \n- Before reaching the UMS Fabric, the request is evaluated by the Conditional Access layer, which applies security policies to determine whether the user is granted access.\n\nThis architecture emphasizes secure access to the UMS Fabric by leveraging Azure's Conditional Access policies to protect resources within the Fabric-RG."
+            },
+            {
+                "filename": "slide_006_img_002.png",
+                "description": "This image is a technical architecture diagram illustrating the authentication and access control flow for Microsoft Fabric using Entra Conditional Access policies.\n\n1. **User Authentication Attempt**:  \n   - The process begins with a user attempting to authenticate to Microsoft Fabric.\n\n2. **Entra Conditional Access Policies**:  \n   - The authentication request is evaluated against Entra Conditional Access policies. This involves three key stages:\n     - **Signal**: Signals such as user identity, group membership, and network location are collected. Examples include:\n       - Users and groups.\n       - Network location.\n     - **Decision**: Based on the signals, a decision is made regarding access.\n     - **Enforcement**: The decision is enforced, allowing or denying access based on the policy evaluation.\n\n3. **Inbound Access to Microsoft Fabric**:  \n   - If access is granted, the user is allowed to interact with Microsoft Fabric.  \n   - Microsoft Fabric includes various components and services, such as:\n     - Data Factory.\n     - Synapse Data Engineering.\n     - Synapse Data Science.\n     - Synapse Data Warehousing.\n     - Synapse Real-Time Analytics.\n     - Power BI.\n     - OneLake (a unified data lake for storage).\n\nThis diagram effectively demonstrates the integration of conditional access policies with Microsoft Fabric to ensure secure and policy-driven access control."
+            },
+            {
+                "filename": "slide_009_img_003.png",
+                "description": "This image represents a technical architecture diagram illustrating a data processing and analytics workflow within the Azure ecosystem, leveraging UMS Fabric and OneLake for data management and Power BI for visualization.\n\n### Components and Data Flow:\n1. **UMS Staging Area (Microsoft SQL Server 2017 \u2013 Data Warehouse):**\n   - Acts as the initial data source where raw data is stored.\n   - Data is ingested from this staging area into the pipeline.\n\n2. **Data Factory (Ingestion):**\n   - Azure Data Factory is used to orchestrate and automate the ingestion of data from the staging area into the UMS Fabric.\n\n3. **XX_Bronze_LK Tables:**\n   - Represents the first layer of data processing.\n   - Raw ingested data is stored in the Bronze layer for initial processing and storage.\n\n4. **XX_Silver_LK Tables:**\n   - Data from the Bronze layer is transformed and refined into the Silver layer.\n   - This layer contains cleaned and enriched data, ready for further processing.\n\n5. **Data Factory and Data Science:**\n   - Data Factory orchestrates the movement of data from the Silver layer to the Gold layer.\n   - Data Science tools are applied at this stage for advanced analytics, machine learning, or predictive modeling.\n\n6. **XX_Gold_LK Tables:**\n   - The Gold layer contains highly processed, curated, and business-ready data.\n   - This data is optimized for reporting and analytics.\n\n7. **Identity_SM:**\n   - Likely represents a service or module for identity management or security, ensuring secure access to the Gold layer data.\n\n8. **OneLake:**\n   - Acts as a unified data lake for storing and managing data across the pipeline.\n   - Facilitates seamless integration and data sharing between components.\n\n9. **Power BI:**\n   - Connected to the Gold layer via OneLake.\n   - Used for creating visualizations, dashboards, and reports for business intelligence.\n\n### Summary:\nThis architecture demonstrates a modern data pipeline leveraging Azure services for data ingestion, transformation, storage, and analytics. It ensures a structured flow from raw data to actionable insights, with a focus on scalability, security, and integration."
+            },
+            {
+                "filename": "slide_011_img_004.png",
+                "description": "This image represents a technical architecture diagram illustrating the data flow between components in a hybrid cloud setup.\n\n1. **UMS - Staging_Area - Microsoft SQL Server 2017 - Data Warehouse**:  \n   - This is the on-premises data storage system, likely used for staging and processing data before further integration or analysis. It is represented as a database icon.\n\n2. **On-Premise Data Gateway (OPDG)**:  \n   - This component acts as a bridge between the on-premises data warehouse and the cloud-based UMS Fabric.  \n   - It facilitates secure data transfer without requiring inbound ports to be opened in the on-premises network, ensuring enhanced security.  \n   - The gateway establishes an **outbound secure connection** to the cloud, enabling seamless communication.\n\n3. **UMS Fabric**:  \n   - This is the cloud-based component or service that interacts with the on-premises data warehouse via the OPDG.  \n   - It likely represents a cloud platform or service layer for further data processing, analytics, or integration.\n\n**Data Flow**:  \n- Data flows bidirectionally between the **UMS - Staging_Area - Microsoft SQL Server 2017 - Data Warehouse** and the **On-Premise Data Gateway (OPDG)**.  \n- The **On-Premise Data Gateway (OPDG)** establishes a secure outbound connection to the **UMS Fabric**, enabling data to flow securely to and from the cloud without requiring inbound ports on the on-premises network."
+            },
+            {
+                "filename": "slide_021_img_005.png",
+                "description": "This image represents a **technical architecture diagram** illustrating a data processing and machine learning workflow within an Azure-based ecosystem. Below is a detailed description of the components and their interactions:\n\n1. **UMS Fabric**:  \n   - Acts as the overarching framework or environment for the workflow. It encapsulates the data flow and machine learning processes.\n\n2. **Data Source - XX_Silver_LK Tables**:  \n   - Represents the intermediate data layer (Silver tables) stored in **OneLake**, which serves as the data lake for the system.  \n   - This data can be processed further using either **AutoML** or **Manual Machine Learning**.\n\n3. **AutoML Path**:  \n   - **AutoML Experiment**: Automatically generates machine learning models based on the input data from the Silver tables.  \n   - **Result Scoring (Using Notebook)**: The results of the AutoML experiment are scored and evaluated using a notebook environment.  \n   - The output is then sent to the **XX_Gold_LK Tables** for further use.\n\n4. **Manual Machine Learning Path**:  \n   - **Modeling (Using Notebook)**: Allows for custom machine learning model development using a notebook environment.  \n   - The manually developed models also output their results to the **XX_Gold_LK Tables**.\n\n5. **XX_Gold_LK Tables**:  \n   - Represents the refined and processed data layer (Gold tables) stored in **OneLake**.  \n   - This layer is used for advanced analytics and reporting.\n\n6. **Identity_SM**:  \n   - A component that likely handles identity management, security, or metadata services for the Gold tables.\n\n7. **Power BI Integration**:  \n   - The Gold tables are connected to **Power BI** via **OneLake** for visualization and business intelligence reporting.\n\nThis architecture demonstrates a flexible machine learning pipeline with options for automated or manual model development, integrated with a robust data lake and visualization platform."
+            }
+        ],
+        "page_count": 28,
+        "page_images": [
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_1.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_2.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_3.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_4.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_5.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_6.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_7.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_8.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_9.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_10.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_11.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_12.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_13.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_14.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_15.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_16.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_17.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_18.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_19.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_20.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_21.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_22.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_23.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_24.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_25.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_26.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_27.jpg",
+            "/api/doc-pages/0aedc5c7-0575-4234-818e-ff3569564f13/page_28.jpg"
+        ],
+        "result_pdf": "C:\\Users\\MuhammadIdzhansKhair\\OneDrive - ENFRASYS\\Documents\\project-internal\\design-document-converter\\python-backend-development\\api_uploads\\0aedc5c7-0575-4234-818e-ff3569564f13\\Solution_Design_Document.pdf",
+        "preview_prepared": true
     }
 }

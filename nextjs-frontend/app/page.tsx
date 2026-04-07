@@ -72,37 +72,40 @@ export default function UploadPage() {
                     onClick={async (e: any) => {
                       e.stopPropagation(); // Stop Dragger upload dialog from opening
                       if (!selectedFile) return;
-                      
+
                       setIsUploading(true);
-                      
+
                       try {
                         const formData = new FormData();
                         formData.append("file", selectedFile);
                         if (selectedLogo) {
                           formData.append("logo", selectedLogo);
                         }
-                        
+
                         const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
                         const res = await fetch(`${API_BASE_URL}/api/upload`, {
                           method: "POST",
                           body: formData
                         });
-                        
+
+                        console.log("Hello there")
+
                         if (!res.ok) throw new Error("Server responded with status " + res.status);
-                        
+
                         const data = await res.json();
                         if (data.error) throw new Error(data.error);
-                        
+
                         if (typeof window !== "undefined") {
                           sessionStorage.setItem("documentTaskId", data.task_id);
                           sessionStorage.setItem("documentPreview", JSON.stringify(data.preview));
                         }
-                        
+
                         router.push('/preview');
                       } catch (err: any) {
                         console.error(err);
                         alert("Failed to upload to backend: " + err.message);
                       } finally {
+                        console.log("Upload complete");
                         setIsUploading(false);
                       }
                     }}

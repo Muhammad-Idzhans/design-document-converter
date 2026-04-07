@@ -19,14 +19,7 @@ except ImportError:
     print("Please run: pip install openai")
     sys.exit(1)
 
-# Import win32com to control PowerPoint for PDF conversion
-try:
-    import win32com.client
-    import pythoncom
-except ImportError:
-    print("Error: The 'pywin32' library is required for PDF conversion.")
-    print("Please run: pip install pywin32")
-    sys.exit(1)
+# Removed strict win32com import requirement to allow Linux cross-platform execution
 
 # ──────────────────────────────────────────────
 # Configuration
@@ -59,32 +52,45 @@ OUTPUT_DIR = PROJECT_DIR / "extraction-output"
 # ──────────────────────────────────────────────
 def convert_pptx_to_pdf(pptx_path: str, pdf_path: str):
     """
-    Convert PPTX to PDF using Microsoft PowerPoint COM interop (Windows only).
+    Convert PPTX to PDF using LibreOffice (Linux/Universal) with a graceful fallback to MS PowerPoint COM.
     """
-    print(f"\n[CONVERT] Converting PPTX to PDF for Azure Analysis...")
-    powerpoint = None
+    import os, subprocess
+    print(f"\n[CONVERT] Converting PPTX to PDF for Azure Analysis (Cross-Platform)...")
+    abs_pptx = os.path.abspath(pptx_path)
+    abs_pdf = os.path.abspath(pdf_path)
+    
+    # Try LibreOffice universally first
     try:
-        # Initialize COM library
+        if os.name == 'posix':
+            subprocess.run(['soffice', '--headless', '--convert-to', 'pdf', '--outdir', os.path.dirname(abs_pdf), abs_pptx], check=True)
+            expected_out = os.path.join(os.path.dirname(abs_pdf), os.path.splitext(os.path.basename(abs_pptx))[0] + ".pdf")
+            if expected_out != abs_pdf and os.path.exists(expected_out):
+                os.rename(expected_out, abs_pdf)
+            print(f"  ✓ Converted successfully via LibreOffice.")
+            return
+    except Exception:
+        pass
+
+    # Windows Native Fallback
+    try:
+        import win32com.client
+        import pythoncom
         pythoncom.CoInitialize()
         powerpoint = win32com.client.Dispatch("PowerPoint.Application")
-        
-        # Open presentation in background
-        abs_pptx = os.path.abspath(pptx_path)
-        abs_pdf = os.path.abspath(pdf_path)
-        
-        # 1 = msoTrue, 0 = msoFalse, 32 = ppSaveAsPDF
         presentation = powerpoint.Presentations.Open(abs_pptx, WithWindow=False)
         presentation.SaveAs(abs_pdf, 32)
         presentation.Close()
-        print(f"  ✓ Converted successfully to PDF.")
+        print(f"  ✓ Converted successfully via MS PowerPoint.")
     except Exception as e:
         print(f"  ⚠ Conversion failed: {e}")
-        print(f"  ⚠ Make sure Microsoft PowerPoint is installed and not currently locking the file.")
         sys.exit(1)
     finally:
-        if powerpoint:
-            powerpoint.Quit()
-        pythoncom.CoUninitialize()
+        try:
+            if 'powerpoint' in locals() and powerpoint:
+                powerpoint.Quit()
+            pythoncom.CoUninitialize()
+        except:
+            pass
 
 
 # ──────────────────────────────────────────────
