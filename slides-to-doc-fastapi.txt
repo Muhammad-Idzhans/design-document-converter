@@ -74,6 +74,21 @@ TASKS_LOCK = RLock()
 # -----------------------------
 app = FastAPI(title="Design Document Generator API")
 
+# Define the exact URLs that are allowed to talk to your backend.
+# Do NOT put a trailing slash (/) at the end of the URL.
+origins = [
+    "http://localhost:3000",
+    "https://design-document-generator-bsh3btapcwchh8a5.southeastasia-01.azurewebsites.net"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all HTTP methods (GET, POST, OPTIONS, etc.)
+    allow_headers=["*"],  # Allows all headers (Content-Type, Authorization, etc.)
+)
+
 def _parse_cors_origins() -> List[str]:
     # Preserve your original default behavior (localhost only),
     # but allow Azure to configure via env: CORS_ORIGINS="https://yourfrontend,https://another"
@@ -127,6 +142,9 @@ async def test_agent_connection():
         print(" Fallback: Standard Offline GPT will be used.")
     print("=" * 60 + "\n")
 
+@app.get("/")
+def health_check():
+    return {"status": "healthy", "message": "Enfrasys Document API is running"}
 
 @app.get("/api/health")
 async def health_check():

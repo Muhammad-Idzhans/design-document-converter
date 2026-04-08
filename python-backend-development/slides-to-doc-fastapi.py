@@ -1578,6 +1578,21 @@ TASKS_LOCK = RLock()
 # -----------------------------
 app = FastAPI(title="Design Document Generator API")
 
+# Define the exact URLs that are allowed to talk to your backend.
+# Do NOT put a trailing slash (/) at the end of the URL.
+origins = [
+    "http://localhost:3000",
+    "https://design-document-generator-bsh3btapcwchh8a5.southeastasia-01.azurewebsites.net"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all HTTP methods (GET, POST, OPTIONS, etc.)
+    allow_headers=["*"],  # Allows all headers (Content-Type, Authorization, etc.)
+)
+
 def _parse_cors_origins() -> List[str]:
     # Preserve your original default behavior (localhost only),
     # but allow Azure to configure via env: CORS_ORIGINS="https://yourfrontend,https://another"
@@ -1585,6 +1600,41 @@ def _parse_cors_origins() -> List[str]:
     if not env_val:
         return ["http://localhost:3000"]
     return [o.strip() for o in env_val.split(",") if o.strip()]
+
+def process_initial_upload(task_id: str, file_path: str, logo_path: Optional[str], src_name: str, task_dir: Path):
+    try:
+        update_task(task_id, {
+            "status": "processing_upload",
+            "step_name": "Generating Slide Thumbnails...",
+            "progress": 20
+        })
+
+        # This is the slow part that was causing Vercel to timeout
+        generate_slide_thumbnails(file_path, task_dir)
+
+        update_task(task_id, {
+            "step_name": "Extracting Slide Data...",
+            "progress": 70
+        })
+
+        preview_data = extract_preview(file_path, task_id)
+
+        # Mark as completely ready for the Next.js Preview Page
+        update_task(task_id, {
+            "status": "upload_complete",
+            "step_name": "Ready for Preview",
+            "progress": 100,
+            "filename": src_name,
+            "file_path": file_path,
+            "logo_path": logo_path,
+            "preview_data": preview_data
+        })
+    except Exception as e:
+        update_task(task_id, {
+            "status": "failed",
+            "step_name": "Upload Failed",
+            "error": str(e)
+        })
 
 app.add_middleware(
     CORSMiddleware,
@@ -1631,6 +1681,9 @@ async def test_agent_connection():
         print(" Fallback: Standard Offline GPT will be used.")
     print("=" * 60 + "\n")
 
+@app.get("/")
+def health_check():
+    return {"status": "healthy", "message": "Enfrasys Document API is running"}
 
 @app.get("/api/health")
 async def health_check():
@@ -3307,13 +3360,54 @@ def convert_md_to_docx(md_path, docx_path, document_title, project_title, client
 # -----------------------------
 # API Endpoints
 # -----------------------------
+# @app.post("/api/upload")
+# async def upload_file(file: UploadFile = File(...), logo: UploadFile = File(None)):
+#     task_id = str(uuid.uuid4())
+#     task_dir = UPLOAD_DIR / task_id
+#     task_dir.mkdir(parents=True, exist_ok=True)
+
+#     # sanitize file names (security)
+#     src_name = safe_filename(file.filename, default="source.pptx")
+#     file_path = task_dir / f"source_{src_name}"
+
+#     with open(file_path, "wb") as f:
+#         shutil.copyfileobj(file.file, f)
+
+#     logo_path = None
+#     if logo:
+#         logo_name = safe_filename(logo.filename, default="logo")
+#         logo_path = task_dir / f"logo_{logo_name}"
+#         with open(logo_path, "wb") as f:
+#             shutil.copyfileobj(logo.file, f)
+
+#     # Generate slide thumbnails
+#     generate_slide_thumbnails(str(file_path), task_dir)
+
+#     try:
+#         preview_data = extract_preview(str(file_path), task_id)
+#     except Exception as e:
+#         return {"error": f"Failed to parse PPTX: {str(e)}"}
+
+#     update_task(task_id, {
+#         "status": "processing",
+#         "step_name": "Initializing",
+#         "progress": 5,
+#         "filename": src_name,
+#         "file_path": str(file_path),
+#         "logo_path": str(logo_path) if logo_path else None,
+#         "preview_data": preview_data
+#     })
+
+#     return {"task_id": task_id, "preview": preview_data}
+# Make sure to import BackgroundTasks from fastapi at the top of your file!
+# from fastapi import BackgroundTasks
+
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...), logo: UploadFile = File(None)):
+async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...), logo: UploadFile = File(None)):
     task_id = str(uuid.uuid4())
     task_dir = UPLOAD_DIR / task_id
     task_dir.mkdir(parents=True, exist_ok=True)
 
-    # sanitize file names (security)
     src_name = safe_filename(file.filename, default="source.pptx")
     file_path = task_dir / f"source_{src_name}"
 
@@ -3327,25 +3421,25 @@ async def upload_file(file: UploadFile = File(...), logo: UploadFile = File(None
         with open(logo_path, "wb") as f:
             shutil.copyfileobj(logo.file, f)
 
-    # Generate slide thumbnails
-    generate_slide_thumbnails(str(file_path), task_dir)
-
-    try:
-        preview_data = extract_preview(str(file_path), task_id)
-    except Exception as e:
-        return {"error": f"Failed to parse PPTX: {str(e)}"}
-
+    # Register task in DB
     update_task(task_id, {
-        "status": "processing",
-        "step_name": "Initializing",
-        "progress": 5,
-        "filename": src_name,
-        "file_path": str(file_path),
-        "logo_path": str(logo_path) if logo_path else None,
-        "preview_data": preview_data
+        "status": "processing_upload",
+        "step_name": "Saving files to Azure...",
+        "progress": 5
     })
 
-    return {"task_id": task_id, "preview": preview_data}
+    # Trigger the background worker
+    background_tasks.add_task(
+        process_initial_upload, 
+        task_id, 
+        str(file_path), 
+        str(logo_path) if logo_path else None, 
+        src_name, 
+        task_dir
+    )
+
+    # Return INSTANTLY to Next.js before Vercel times out!
+    return {"task_id": task_id, "status": "processing_upload"}
 
 
 def background_processing(task_id: str):
@@ -3487,6 +3581,10 @@ async def get_status(task_id: str):
         response["asset_library"] = task.get("asset_library", [])
         response["page_count"] = task.get("page_count", 0)
 
+    # Add this inside get_status
+    if task.get("status") == "upload_complete":
+        response["preview_data"] = task.get("preview_data")
+        
     return response
 
 

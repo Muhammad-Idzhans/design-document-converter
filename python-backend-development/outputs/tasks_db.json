@@ -3084,5 +3084,182 @@
         ],
         "result_pdf": "C:\\Users\\MuhammadIdzhansKhair\\OneDrive - ENFRASYS\\Documents\\project-internal\\design-document-converter\\python-backend-development\\outputs\\api_uploads\\c31373d8-0775-439f-8d34-7ec0a38cacc5\\Solution_Design_Document.pdf",
         "preview_prepared": true
+    },
+    "ecb8931e-ac5a-454e-9584-22981cadd26b": {
+        "status": "upload_complete",
+        "step_name": "Ready for Preview",
+        "progress": 100,
+        "filename": "UMS_PowerBI_Fabric_Design_Workshop_v1.1_final.pptx",
+        "file_path": "C:\\Users\\MuhammadIdzhansKhair\\OneDrive - ENFRASYS\\Documents\\project-internal\\design-document-converter\\python-backend-development\\outputs\\api_uploads\\ecb8931e-ac5a-454e-9584-22981cadd26b\\source_UMS_PowerBI_Fabric_Design_Workshop_v1.1_final.pptx",
+        "logo_path": "C:\\Users\\MuhammadIdzhansKhair\\OneDrive - ENFRASYS\\Documents\\project-internal\\design-document-converter\\python-backend-development\\outputs\\api_uploads\\ecb8931e-ac5a-454e-9584-22981cadd26b\\logo_ums-logo.png",
+        "preview_data": {
+            "filename": "source_UMS_PowerBI_Fabric_Design_Workshop_v1.1_final.pptx",
+            "total_slides": 27,
+            "diagrams_detected": 5,
+            "slides": [
+                {
+                    "slide_number": 1,
+                    "title": "UMS\u000b Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_1.jpg"
+                },
+                {
+                    "slide_number": 2,
+                    "title": "Agenda",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_2.jpg"
+                },
+                {
+                    "slide_number": 3,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_3.jpg"
+                },
+                {
+                    "slide_number": 4,
+                    "title": "Objective",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_4.jpg"
+                },
+                {
+                    "slide_number": 5,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_5.jpg"
+                },
+                {
+                    "slide_number": 6,
+                    "title": "Slide 6",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_6.jpg"
+                },
+                {
+                    "slide_number": 7,
+                    "title": "Slide 7",
+                    "notes": "There will be some limitations to implement private link, so we opted out for this for future implementation (CA)\n\nExplain the reasoning\n\nThen go through the table:\n\nAdditional license should be purchased for CA\nMicrosoft Entra ID Free, P1, P2\nWe can visit this later, if want to proceed further\nWe will enforce MFA \n\n\n\nNot p1 or p2\n\nThis suggestion will be for later, further purposes",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_7.jpg"
+                },
+                {
+                    "slide_number": 8,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_8.jpg"
+                },
+                {
+                    "slide_number": 9,
+                    "title": "Data Workflow Design",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_9.jpg"
+                },
+                {
+                    "slide_number": 10,
+                    "title": "Data Workflow Design Consideration",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_10.jpg"
+                },
+                {
+                    "slide_number": 11,
+                    "title": "Data Gateway Design",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_11.jpg"
+                },
+                {
+                    "slide_number": 12,
+                    "title": "VM Size Consideration",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_12.jpg"
+                },
+                {
+                    "slide_number": 13,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_13.jpg"
+                },
+                {
+                    "slide_number": 14,
+                    "title": "Azure Outbound Security Rules Consideration",
+                    "notes": "defines the outbound network rules required to allow the On-Premises Data Gateway (OPDG) virtual machine (VM) to securely connect to Microsoft Fabric, Power BI, and related Microsoft cloud services. These rules ensure that the gateway can authenticate, communicate, and transfer data through HTTPS in compliance with Azure networking best practices.\n\nRule Name : Allow_OPDG_HTTPS_Services\nPurpose: Enables HTTPS communication from the gateway VM to Microsoft Fabric and Power BI endpoints.\nExplanation: This rule allows outbound TCP traffic on port 443 (HTTPS) from VM Private IP Addresses to essential Microsoft domains, including Fabric, Power BI, and Azure core services (e.g., *.fabric.microsoft.com, *.powerbi.com). It ensures that the gateway can send and receive data securely using SSL/TLS encryption.\n\nRule Name: Allow_OPDG_Authentication\nPurpose: Enables authentication and identity verification with Microsoft Entra ID (formerly Azure AD).\nExplanation: This rule allows outbound HTTPS traffic (TCP port 443) to identity and login domains such as login.microsoftonline.com, aadcdn.msftauth.net, and login.windows.net. It enables user sign-ins, token validation, and secure connection establishment with Microsoft cloud services.\n\nRule Name: Allow_OPDG_Connectivity_Test\nPurpose: Supports network connectivity verification for the OPDG service.\nExplanation: This rule allows outbound HTTP traffic on port 80 (TCP) to *.msftncsi.com, a Microsoft endpoint used for network connectivity status indication and troubleshooting. It ensures the VM can verify external internet access and service availability.",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_14.jpg"
+                },
+                {
+                    "slide_number": 15,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_15.jpg"
+                },
+                {
+                    "slide_number": 16,
+                    "title": "Slide 16",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_16.jpg"
+                },
+                {
+                    "slide_number": 17,
+                    "title": "Slide 17",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_17.jpg"
+                },
+                {
+                    "slide_number": 18,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_18.jpg"
+                },
+                {
+                    "slide_number": 19,
+                    "title": "Naming Convention",
+                    "notes": "Capacity and workspace (tambah)",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_19.jpg"
+                },
+                {
+                    "slide_number": 20,
+                    "title": "Power BI & Fabric",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_20.jpg"
+                },
+                {
+                    "slide_number": 21,
+                    "title": "AutoML Workflow Design",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_21.jpg"
+                },
+                {
+                    "slide_number": 22,
+                    "title": "AutoML Workflow Design Consideration",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_22.jpg"
+                },
+                {
+                    "slide_number": 23,
+                    "title": "Next Action",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_23.jpg"
+                },
+                {
+                    "slide_number": 24,
+                    "title": "Next Action",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_24.jpg"
+                },
+                {
+                    "slide_number": 25,
+                    "title": "Q & A Session",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_25.jpg"
+                },
+                {
+                    "slide_number": 26,
+                    "title": "Slide 26",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_26.jpg"
+                },
+                {
+                    "slide_number": 27,
+                    "title": "Contact Us",
+                    "notes": "No presenter note",
+                    "thumbnail_url": "/api/thumbnails/ecb8931e-ac5a-454e-9584-22981cadd26b/slide_27.jpg"
+                }
+            ]
+        }
     }
 }
