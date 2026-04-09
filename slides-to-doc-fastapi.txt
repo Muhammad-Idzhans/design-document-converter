@@ -38,7 +38,9 @@ load_dotenv()
 # -----------------------------
 # Environment & Paths (Azure-safe)
 # -----------------------------
-IS_LINUX = os.name == "posix"
+# IS_LINUX = os.name == "posix"
+# Replace IS_LINUX with this:
+IS_LINUX = os.name == "posix" or os.getenv("FORCE_LIBREOFFICE", "false").lower() == "true"
 
 CONTENT_UNDERSTANDING_ENDPOINT = os.getenv("CONTENT_UNDERSTANDING_ENDPOINT", "").rstrip("/")
 CONTENT_UNDERSTANDING_KEY = os.getenv("CONTENT_UNDERSTANDING_KEY", "")
@@ -78,7 +80,7 @@ app = FastAPI(title="Design Document Generator API")
 # Do NOT put a trailing slash (/) at the end of the URL.
 origins = [
     "http://localhost:3000",
-    "https://design-document-generator-bsh3btapcwchh8a5.southeastasia-01.azurewebsites.net"
+    "https://design-document-converter.vercel.app"
 ]
 
 app.add_middleware(
@@ -96,6 +98,41 @@ def _parse_cors_origins() -> List[str]:
     if not env_val:
         return ["http://localhost:3000"]
     return [o.strip() for o in env_val.split(",") if o.strip()]
+
+def process_initial_upload(task_id: str, file_path: str, logo_path: Optional[str], src_name: str, task_dir: Path):
+    try:
+        update_task(task_id, {
+            "status": "processing_upload",
+            "step_name": "Generating Slide Thumbnails...",
+            "progress": 20
+        })
+
+        # This is the slow part that was causing Vercel to timeout
+        generate_slide_thumbnails(file_path, task_dir)
+
+        update_task(task_id, {
+            "step_name": "Extracting Slide Data...",
+            "progress": 70
+        })
+
+        preview_data = extract_preview(file_path, task_id)
+
+        # Mark as completely ready for the Next.js Preview Page
+        update_task(task_id, {
+            "status": "upload_complete",
+            "step_name": "Ready for Preview",
+            "progress": 100,
+            "filename": src_name,
+            "file_path": file_path,
+            "logo_path": logo_path,
+            "preview_data": preview_data
+        })
+    except Exception as e:
+        update_task(task_id, {
+            "status": "failed",
+            "step_name": "Upload Failed",
+            "error": str(e)
+        })
 
 app.add_middleware(
     CORSMiddleware,
@@ -254,23 +291,34 @@ def convert_docx_to_pdf(docx_path: str, pdf_path: str) -> None:
     abs_pdf = os.path.abspath(pdf_path)
 
     # Linux/Docker path: LibreOffice headless
+    # if IS_LINUX:
+    #     _ensure_soffice_available()
+    #     out_dir = os.path.dirname(abs_pdf)
+    #     try:
+    #         subprocess.run(
+    #             ["soffice", "--headless", "--nologo", "--nofirststartwizard",
+    #              "--convert-to", "pdf", "--outdir", out_dir, abs_docx],
+    #             check=True
+    #         )
+    #         expected_out = os.path.join(out_dir, os.path.splitext(os.path.basename(abs_docx))[0] + ".pdf")
+    #         if expected_out != abs_pdf and os.path.exists(expected_out):
+    #             os.rename(expected_out, abs_pdf)
+    #         if not os.path.exists(abs_pdf):
+    #             raise RuntimeError("LibreOffice conversion succeeded but output PDF not found.")
+    #         return
+    #     except Exception as e:
+    #         raise RuntimeError(f"DOCX to PDF conversion failed on Linux (LibreOffice): {e}")
+
     if IS_LINUX:
-        _ensure_soffice_available()
-        out_dir = os.path.dirname(abs_pdf)
-        try:
-            subprocess.run(
-                ["soffice", "--headless", "--nologo", "--nofirststartwizard",
-                 "--convert-to", "pdf", "--outdir", out_dir, abs_docx],
-                check=True
-            )
-            expected_out = os.path.join(out_dir, os.path.splitext(os.path.basename(abs_docx))[0] + ".pdf")
-            if expected_out != abs_pdf and os.path.exists(expected_out):
-                os.rename(expected_out, abs_pdf)
-            if not os.path.exists(abs_pdf):
-                raise RuntimeError("LibreOffice conversion succeeded but output PDF not found.")
-            return
-        except Exception as e:
-            raise RuntimeError(f"DOCX to PDF conversion failed on Linux (LibreOffice): {e}")
+        subprocess.run(
+            ["soffice", "--headless", "--invisible", 
+             "--convert-to", "pdf", 
+             "--outdir", out_dir, 
+             # Add these lines to force TOC/Field updates
+             "-env:UserInstallation=file:///tmp/libreoffice_user",
+             abs_docx],
+            check=True
+        )
 
     # Windows Native Fallback
     if win32com is None or pythoncom is None:
@@ -786,31 +834,22 @@ def write_document_sections(toc: Dict[str, Any], extraction_payload: Dict[str, A
         - Cost Management Tools: columns = Azure Tool | Description | Cost Management Discipline
 
         -- STRICT IMAGE RULES --
-        - Select only architecture diagrams, data flow diagrams, network topologies, or access/security diagrams.
-        - Each UNIQUE image file_path may only be embedded ONCE across the entire document.
-        - Syntax: `![](file_path)` — use the exact path from the JSON. Do NOT invent paths.
-        - CAPTION RULE: You MUST place a blank empty line between the image and its caption to separate them! 
-            Example:
-            ![](file_path)
-
-            Figure 1: High-level architecture.
-        - DO NOT copy-paste the long 'ai_description' from the JSON into the document. Keep the actual output caption extremely brief.
+        - Syntax: `![](RELATIVE_PATH)` 
+        - CRITICAL: You MUST use only the filename (e.g., images/slide_001.png) for the path, NOT the absolute path.
+        
+        -- TABLE RULES --
+        - Keep tables simple. Do not use nested tables or complex merges.
 
         -- NO-REPETITION RULES --
         1. Each table must appear EXACTLY ONCE across the full document. If a table was in a main section, the Appendix must NOT repeat it.
         2. NSG rules belong ONLY in the Security Design section.
         3. VM specifications belong ONLY in the Platform Design section.
         4. Naming convention tables belong ONLY in the Resource Organization Design sub-section.
-        -- APPENDIX FORMATTING (STRICT RULES) --
-        Each appendix entry MUST have exactly these three H3 sub-sections:
-        ### Introduction/Prerequisites
-        ### Limits and Boundaries
-        ### Others
-        ZERO EXPLANATION RULE: Do NOT write any introductory sentences, concluding remarks, or explanations in the Appendix sections. Output ONLY the headers and the links.
-        CRITICAL LINK FORMATTING (READ CAREFULLY):
-        - You MUST leave a blank empty line between every single link so they do not merge together into one paragraph.
-        - Do NOT use bullet points (`*` or `-`).
-        - To ensure the URL is visible AND clickable (blue), you MUST use this exact self-referencing Markdown syntax: `Title: [URL](URL)`
+        
+        -- APPENDIX FORMATTING --
+        - Do NOT use the Title: [URL](URL) syntax.
+        - Use standard Markdown: `[Title of the Link](URL)`
+        - Leave a blank line between links.
     """
 
     use_agent = False
@@ -921,7 +960,374 @@ def _clear_paragraph(paragraph):
     for child in list(p):
         p.remove(child)
 
+# def convert_md_to_docx(md_path, docx_path, document_title, project_title, client_name, client_logo_path=None):
+#     try:
+#         import pypandoc
+#         from docx import Document
+#         from docx.oxml.ns import qn
+#         from docx.oxml import OxmlElement
 
+#         # template_file = str(SCRIPT_DIR / "enfrasys_template.docx")
+#         # extra_args = [f"--reference-doc={template_file}"] if os.path.exists(template_file) else []
+
+#         # Requires pandoc binary installed in container
+#         pypandoc.convert_file(
+#             str(md_path),
+#             "docx",
+#             outputfile=str(docx_path),
+#             extra_args=extra_args
+#         )
+
+#         doc = Document(str(docx_path))
+#         from docx.shared import Pt, RGBColor, Inches
+#         from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
+#         from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+
+#         # Center images from markdown conversion
+#         for p in doc.paragraphs:
+#             for run in p.runs:
+#                 drawing = getattr(run._element, "drawing_lst", None)
+#                 if drawing:
+#                     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+#             # Format caption
+#             text = p.text.strip()
+#             if text.lower().startswith("figure ") and ":" in text:
+#                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+#                 for run in p.runs:
+#                     run.font.size = Pt(10)
+#                     run.font.italic = True
+#                     run.font.color.rgb = RGBColor(128, 128, 128)
+
+#         # Resize images
+#         for shape in doc.inline_shapes:
+#             max_height = Inches(4.5)
+#             if shape.height > max_height:
+#                 ratio = max_height / float(shape.height)
+#                 shape.height = max_height
+#                 shape.width = int(shape.width * ratio)
+
+#         # Prepare first paragraph / title page insertion
+#         if len(doc.paragraphs) > 0:
+#             first_p = doc.paragraphs[0]
+#             _clear_paragraph(first_p)
+#         else:
+#             first_p = doc.add_paragraph()
+
+#         first_p.paragraph_format.page_break_before = False
+
+#         def set_p_bottom_border(p):
+#             pPr = p._element.get_or_add_pPr()
+#             pBdr = OxmlElement("w:pBdr")
+#             pPr.append(pBdr)
+#             bottom = OxmlElement("w:bottom")
+#             bottom.set(qn("w:val"), "single")
+#             bottom.set(qn("w:sz"), "144")
+#             bottom.set(qn("w:space"), "1")
+#             bottom.set(qn("w:color"), "000000")
+#             pBdr.append(bottom)
+
+#         p_bar = first_p.insert_paragraph_before("")
+#         set_p_bottom_border(p_bar)
+
+#         p_title = first_p.insert_paragraph_before()
+#         p_title.paragraph_format.space_before = Pt(6)
+#         run = p_title.add_run(project_title)
+#         run.font.name = "Segoe UI"
+#         run.font.size = Pt(22)
+#         run.font.color.rgb = RGBColor(0, 0, 0)
+
+#         p_sub = first_p.insert_paragraph_before()
+#         p_sub.paragraph_format.space_before = Pt(24)
+#         run = p_sub.add_run("Planning & Design Document")
+#         run.font.name = "Segoe UI"
+#         run.font.size = Pt(22)
+#         run.font.color.rgb = RGBColor(0, 0, 0)
+
+#         if client_logo_path and os.path.exists(client_logo_path):
+#             p_logo = first_p.insert_paragraph_before()
+#             p_logo.paragraph_format.space_before = Pt(40)
+#             run = p_logo.add_run()
+#             try:
+#                 run.add_picture(str(client_logo_path), height=Inches(1.5))
+#             except Exception:
+#                 pass
+
+#         for _ in range(4):
+#             first_p.insert_paragraph_before("")
+
+#         p_abs_div = first_p.insert_paragraph_before("")
+
+#         def set_p_thin_bottom_border(p):
+#             pPr = p._element.get_or_add_pPr()
+#             pBdr = OxmlElement("w:pBdr")
+#             pPr.append(pBdr)
+#             bottom = OxmlElement("w:bottom")
+#             bottom.set(qn("w:val"), "single")
+#             bottom.set(qn("w:sz"), "8")
+#             bottom.set(qn("w:space"), "1")
+#             bottom.set(qn("w:color"), "000000")
+#             pBdr.append(bottom)
+
+#         set_p_thin_bottom_border(p_abs_div)
+
+#         p_abs_title = first_p.insert_paragraph_before()
+#         p_abs_title.paragraph_format.space_before = Pt(6)
+#         run = p_abs_title.add_run("Abstract")
+#         run.font.name = "Segoe UI"
+#         run.bold = True
+#         run.font.size = Pt(11)
+
+#         p_abs_text = first_p.insert_paragraph_before()
+#         p_abs_text.paragraph_format.space_before = Pt(6)
+#         run = p_abs_text.add_run(f"This document defines the Planning and Design for {document_title} project.")
+#         run.font.name = "Segoe UI"
+#         run.font.size = Pt(11)
+
+#         for _ in range(2):
+#             first_p.insert_paragraph_before("")
+
+#         p_prep = first_p.insert_paragraph_before()
+#         run = p_prep.add_run("Prepared By")
+#         run.font.name = "Segoe UI"
+#         run.font.size = Pt(11)
+
+#         enfrasys_logo = SCRIPT_DIR / "enfrasys-logo.jpg"
+#         if os.path.exists(enfrasys_logo):
+#             p_enfrasys = first_p.insert_paragraph_before()
+#             p_enfrasys.paragraph_format.space_before = Pt(10)
+#             run = p_enfrasys.add_run()
+#             try:
+#                 run.add_picture(str(enfrasys_logo), width=Inches(1.5))
+#             except Exception:
+#                 pass
+
+#         p_break_title = first_p.insert_paragraph_before("")
+#         p_break_title.add_run().add_break(WD_BREAK.PAGE)
+
+#         doc.sections[0].different_first_page_header_footer = True
+#         header = doc.sections[0].header
+
+#         htable = header.add_table(1, 2, Inches(6.0))
+#         for p in header.paragraphs:
+#             if not p._element.getparent() == htable._element and p.text.strip() == "":
+#                 p_elem_h = p._element
+#                 p_elem_h.getparent().remove(p_elem_h)
+
+#         tblPr_h = htable._tbl.tblPr
+#         tblBorders = OxmlElement("w:tblBorders")
+#         for border_name in ["top", "left", "bottom", "right", "insideH", "insideV"]:
+#             border = OxmlElement(f"w:{border_name}")
+#             border.set(qn("w:val"), "none")
+#             tblBorders.append(border)
+#         tblPr_h.append(tblBorders)
+
+#         cell_left = htable.cell(0, 0)
+#         cell_right = htable.cell(0, 1)
+
+#         if client_logo_path and os.path.exists(client_logo_path):
+#             p_left = cell_left.paragraphs[0]
+#             p_left.alignment = WD_ALIGN_PARAGRAPH.LEFT
+#             try:
+#                 p_left.add_run().add_picture(str(client_logo_path), height=Inches(0.6))
+#             except Exception:
+#                 pass
+
+#         cell_right.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+#         if os.path.exists(enfrasys_logo):
+#             p_right = cell_right.paragraphs[0]
+#             p_right.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+#             try:
+#                 p_right.add_run().add_picture(str(enfrasys_logo), width=Inches(1.5))
+#             except Exception:
+#                 pass
+
+#         # ---------------------------------------------------------
+#         # 1. DYNAMIC FOOTER CREATION (No Template Dependency)
+#         # ---------------------------------------------------------
+#         from docx.enum.text import WD_TAB_ALIGNMENT
+#         from docx.oxml import OxmlElement
+#         from docx.oxml.ns import qn
+        
+#         clean_title = document_title.replace('\n', '').replace('\r', '').strip()
+        
+#         for section in doc.sections:
+#             footer = section.footer
+            
+#             # 1. Clear any existing paragraphs/footers coming from the template
+#             for p in footer.paragraphs:
+#                 p_element = p._element
+#                 p_element.getparent().remove(p_element)
+                
+#             # 2. Create a fresh, empty paragraph for our new footer
+#             para = footer.add_paragraph()
+            
+#             # 3. Set a Right-Aligned tab stop at 6.5 inches (pushes text after '\t' to the right edge)
+#             para.paragraph_format.tab_stops.clear_all()
+#             para.paragraph_format.tab_stops.add_tab_stop(Inches(6.5), WD_TAB_ALIGNMENT.RIGHT)
+            
+#             # 4. Add the Left Side: Project Title + a Tab Character (\t)
+#             run_left = para.add_run(f"{clean_title} - Planning & Design Document\t")
+#             run_left.font.name = 'Times New Roman'
+#             run_left.font.size = Pt(9)
+            
+#             # 5. Add the Right Side: Dynamic Page Number XML
+#             run_right = para.add_run()
+#             run_right.font.name = 'Times New Roman'
+#             run_right.font.size = Pt(9)
+            
+#             # --- START OF WORD XML MAGIC FOR DYNAMIC PAGE NUMBERS ---
+#             fldChar_begin = OxmlElement('w:fldChar')
+#             fldChar_begin.set(qn('w:fldCharType'), 'begin')
+            
+#             instrText = OxmlElement('w:instrText')
+#             instrText.set(qn('xml:space'), 'preserve')
+#             instrText.text = "PAGE"  # This tells Word to calculate the current page number
+            
+#             fldChar_end = OxmlElement('w:fldChar')
+#             fldChar_end.set(qn('w:fldCharType'), 'end')
+            
+#             # Append the XML elements to the run
+#             run_right._r.append(fldChar_begin)
+#             run_right._r.append(instrText)
+#             run_right._r.append(fldChar_end)
+#             # --- END OF XML MAGIC ---
+
+#         # ---------------------------------------------------------
+#         # 2. GLOBAL FONT ENFORCEMENT, JUSTIFICATION & CAPTIONS
+#         # ---------------------------------------------------------
+#         from docx.enum.text import WD_ALIGN_PARAGRAPH
+#         from docx.shared import RGBColor
+#         import re
+
+#         style_rules = {
+#             'Heading 1': {'size': 15, 'bold': False},
+#             'Heading 2': {'size': 14, 'bold': False}, 
+#             'Heading 3': {'size': 13, 'bold': False},
+#             'Heading 4': {'size': 12, 'bold': False},
+#         }
+
+#         figure_counter = 1  # Global counter to ensure continuous numbering!
+
+#         for para in doc.paragraphs:
+#             text = para.text.strip()
+#             if not text:
+#                 continue
+
+#             # --- A. FIX IMAGE CAPTIONS (Renumber & Center) ---
+#             if text.lower().startswith("figure ") and ":" in text:
+#                 # Regex replaces "Figure 1:", "Figure 2 :", etc., with the running counter
+#                 new_text = re.sub(r'(?i)^figure\s+\d+\s*:', f'Figure {figure_counter}:', text)
+#                 para.text = new_text
+                
+#                 para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+#                 for run in para.runs:
+#                     run.font.name = 'Segoe UI'
+#                     run.font.size = Pt(10)
+#                     run.font.italic = True
+#                     run.font.color.rgb = RGBColor(128, 128, 128)
+                
+#                 figure_counter += 1
+#                 continue  # Skip the rest of the loop so we don't overwrite caption styling
+
+#             # --- B. STANDARD TEXT JUSTIFICATION ---
+#             if para.style.name == "Normal":
+#                 para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+
+#             # --- C. PAGE BREAKS FOR MAIN SECTIONS ---
+#             if para.style.name == "Heading 1" or any(text.startswith(f"{i}.0") for i in range(2, 21)):
+#                 # Protect 1.0 (Sign-off) and 2.0 (Exec Summary) from getting double page breaks!
+#                 if not text.startswith("1.0") and not text.startswith("2.0"): 
+#                     para.paragraph_format.page_break_before = True
+
+#             # --- D. ENFORCE TYPOGRAPHY SCALING ---
+#             style_name = para.style.name
+#             rule = style_rules.get(style_name)
+#             for run in para.runs:
+#                 run.font.name = 'Segoe UI'
+#                 if rule:
+#                     run.font.size = Pt(rule['size'])
+#                     run.font.bold = rule['bold']
+#                 else:
+#                     if run.font.size is None:
+#                         run.font.size = Pt(11)
+
+#         # ---------------------------------------------------------
+#         # 3. TABLE FIXES (Banding, Widths, and Fonts)
+#         # ---------------------------------------------------------
+#         from docx.oxml.ns import qn
+#         from docx.oxml import OxmlElement
+
+#         for table in doc.tables:
+#             is_signature_table = False
+#             for row in table.rows:
+#                 for cell in row.cells:
+#                     if "Prepared by:" in cell.text or "Reviewed by:" in cell.text:
+#                         is_signature_table = True
+#                         break
+#                 if is_signature_table: break
+            
+#             if is_signature_table:
+#                 try: table.style = 'Table Grid'
+#                 except: pass
+#                 continue
+            
+#             try:
+#                 table.style = 'Grid Table 4 - Accent 11' 
+#             except KeyError:
+#                 try: table.style = 'Grid Table 4 Accent 11'
+#                 except KeyError:
+#                     try: table.style = 'Table Grid'
+#                     except: pass
+            
+#             # Turn off vertical banding via XML
+#             tblPr = table._tbl.tblPr
+#             tblLook = tblPr.find(qn("w:tblLook"))
+#             if tblLook is None:
+#                 tblLook = OxmlElement('w:tblLook')
+#                 tblPr.append(tblLook)
+                
+#             tblLook.set(qn('w:val'), '04A0')        
+#             tblLook.set(qn('w:firstRow'), '1')      
+#             tblLook.set(qn('w:lastRow'), '0')       
+#             tblLook.set(qn('w:firstColumn'), '1')   
+#             tblLook.set(qn('w:lastColumn'), '0')    
+#             tblLook.set(qn('w:noHBand'), '0')       
+#             tblLook.set(qn('w:noVBand'), '1')       
+            
+#             # Force wide tables to 100% width
+#             if len(table.columns) >= 5:
+#                 tblW = tblPr.find(qn('w:tblW'))
+#                 if tblW is None:
+#                     tblW = OxmlElement('w:tblW')
+#                     tblPr.append(tblW)
+#                 tblW.set(qn('w:type'), 'pct')
+#                 tblW.set(qn('w:w'), '5000') 
+#                 for row in table.rows:
+#                     for cell in row.cells:
+#                         tcPr = cell._tc.get_or_add_tcPr()
+#                         tcW = tcPr.find(qn('w:tcW'))
+#                         if tcW is not None:
+#                             tcW.set(qn('w:type'), 'auto') 
+#                             tcW.set(qn('w:w'), '0')
+            
+#             table.autofit = True
+#             table.allow_autofit = True
+
+#             # Standardize table fonts
+#             for row in table.rows:
+#                 for cell in row.cells:
+#                     for p in cell.paragraphs:
+#                         for run in p.runs:
+#                             run.font.name = 'Segoe UI'
+#                             if run.font.size is None:
+#                                 run.font.size = Pt(11)
+
+#         doc.save(str(docx_path))
+
+#     except Exception as e:
+#         # preserve original behavior (silent), but print for Azure logs
+#         print(f"[convert_md_to_docx] Warning: {e}")
 def convert_md_to_docx(md_path, docx_path, document_title, project_title, client_name, client_logo_path=None):
     try:
         import pypandoc
@@ -929,10 +1335,37 @@ def convert_md_to_docx(md_path, docx_path, document_title, project_title, client
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
 
-        template_file = str(SCRIPT_DIR / "enfrasys_template.docx")
-        extra_args = [f"--reference-doc={template_file}"] if os.path.exists(template_file) else []
+        # template_file = str(SCRIPT_DIR / "enfrasys_template.docx")
+        # extra_args = [f"--reference-doc={template_file}"] if os.path.exists(template_file) else []
 
-        # Requires pandoc binary installed in container
+        # template_file = str(SCRIPT_DIR / "enfrasys_template.docx")
+
+        # # CRITICAL FIX: Do not fail silently. If the template is missing on Azure, we need to know.
+        # if not os.path.exists(template_file):
+        #     raise FileNotFoundError(f"Deployment Error: enfrasys_template.docx is missing at {template_file}")
+
+        # extra_args = [f"--reference-doc={template_file}"]
+
+        # # Requires pandoc binary installed in container
+        # pypandoc.convert_file(
+        #     str(md_path),
+        #     "docx",
+        #     outputfile=str(docx_path),
+        #     extra_args=extra_args
+        # )
+
+        template_file = str(SCRIPT_DIR / "enfrasys_template.docx")
+
+        if not os.path.exists(template_file):
+            raise FileNotFoundError(f"Deployment Error: enfrasys_template.docx is missing at {template_file}")
+
+        # ADD THE RESOURCE PATH HERE: Point it to the specific task directory
+        task_dir_str = str(Path(md_path).parent.resolve())
+        extra_args = [
+            f"--reference-doc={template_file}",
+            f"--resource-path={task_dir_str}"  # Tells Pandoc where to find the relative images
+        ]
+
         pypandoc.convert_file(
             str(md_path),
             "docx",
@@ -1384,66 +1817,125 @@ def convert_md_to_docx(md_path, docx_path, document_title, project_title, client
         # ---------------------------------------------------------
         # TABLE FIXES (Banding, Widths, and Fonts)
         # ---------------------------------------------------------
-        for table in doc.tables:
-            is_signature_table = False
-            for row in table.rows:
-                for cell in row.cells:
-                    if "Prepared by:" in cell.text or "Reviewed by:" in cell.text:
-                        is_signature_table = True
-                        break
-                if is_signature_table: break
+        # for table in doc.tables:
+        #     is_signature_table = False
+        #     for row in table.rows:
+        #         for cell in row.cells:
+        #             if "Prepared by:" in cell.text or "Reviewed by:" in cell.text:
+        #                 is_signature_table = True
+        #                 break
+        #         if is_signature_table: break
             
-            if is_signature_table:
-                try: table.style = 'Table Grid'
-                except: pass
-                continue
+        #     if is_signature_table:
+        #         try: table.style = 'Table Grid'
+        #         except: pass
+        #         continue
             
-            try: table.style = 'Grid Table 4 - Accent 11' 
-            except KeyError:
-                try: table.style = 'Grid Table 4 Accent 11'
-                except KeyError:
-                    try: table.style = 'Table Grid'
-                    except: pass
+        #     try: table.style = 'Grid Table 4 - Accent 11' 
+        #     except KeyError:
+        #         try: table.style = 'Grid Table 4 Accent 11'
+        #         except KeyError:
+        #             try: table.style = 'Table Grid'
+        #             except: pass
             
-            tblPr = table._tbl.tblPr
-            tblLook = tblPr.find(qn("w:tblLook"))
-            if tblLook is None:
-                tblLook = OxmlElement('w:tblLook')
-                tblPr.append(tblLook)
+        #     tblPr = table._tbl.tblPr
+        #     tblLook = tblPr.find(qn("w:tblLook"))
+        #     if tblLook is None:
+        #         tblLook = OxmlElement('w:tblLook')
+        #         tblPr.append(tblLook)
                 
-            tblLook.set(qn('w:val'), '04A0')        
-            tblLook.set(qn('w:firstRow'), '1')      
-            tblLook.set(qn('w:lastRow'), '0')       
-            tblLook.set(qn('w:firstColumn'), '1')   
-            tblLook.set(qn('w:lastColumn'), '0')    
-            tblLook.set(qn('w:noHBand'), '0')       
-            tblLook.set(qn('w:noVBand'), '1')       
+        #     tblLook.set(qn('w:val'), '04A0')        
+        #     tblLook.set(qn('w:firstRow'), '1')      
+        #     tblLook.set(qn('w:lastRow'), '0')       
+        #     tblLook.set(qn('w:firstColumn'), '1')   
+        #     tblLook.set(qn('w:lastColumn'), '0')    
+        #     tblLook.set(qn('w:noHBand'), '0')       
+        #     tblLook.set(qn('w:noVBand'), '1')       
             
-            if len(table.columns) >= 5:
-                tblW = tblPr.find(qn('w:tblW'))
-                if tblW is None:
-                    tblW = OxmlElement('w:tblW')
-                    tblPr.append(tblW)
-                tblW.set(qn('w:type'), 'pct')
-                tblW.set(qn('w:w'), '5000') 
-                for row in table.rows:
-                    for cell in row.cells:
-                        tcPr = cell._tc.get_or_add_tcPr()
-                        tcW = tcPr.find(qn('w:tcW'))
-                        if tcW is not None:
-                            tcW.set(qn('w:type'), 'auto') 
-                            tcW.set(qn('w:w'), '0')
+        #     if len(table.columns) >= 5:
+        #         tblW = tblPr.find(qn('w:tblW'))
+        #         if tblW is None:
+        #             tblW = OxmlElement('w:tblW')
+        #             tblPr.append(tblW)
+        #         tblW.set(qn('w:type'), 'pct')
+        #         tblW.set(qn('w:w'), '5000') 
+        #         for row in table.rows:
+        #             for cell in row.cells:
+        #                 tcPr = cell._tc.get_or_add_tcPr()
+        #                 tcW = tcPr.find(qn('w:tcW'))
+        #                 if tcW is not None:
+        #                     tcW.set(qn('w:type'), 'auto') 
+        #                     tcW.set(qn('w:w'), '0')
             
+        #     table.autofit = True
+        #     table.allow_autofit = True
+
+        #     for row in table.rows:
+        #         for cell in row.cells:
+        #             for p in cell.paragraphs:
+        #                 for run in p.runs:
+        #                     run.font.name = 'Segoe UI'
+        #                     if run.font.size is None:
+        #                         run.font.size = Pt(11)
+
+        # ---------------------------------------------------------
+        # AZURE-SAFE TABLE FIXES 
+        # ---------------------------------------------------------
+        # for table in doc.tables:
+        #     is_signature_table = False
+        #     for row in table.rows:
+        #         for cell in row.cells:
+        #             if "Prepared by:" in cell.text or "Reviewed by:" in cell.text:
+        #                 is_signature_table = True
+        #                 break
+        #         if is_signature_table: break
+            
+        #     if is_signature_table:
+        #         try: table.style = 'Table Grid'
+        #         except: pass
+        #         continue
+            
+        #     # Rely on the template's styles, not raw XML
+        #     try: 
+        #         table.style = 'Grid Table 4 - Accent 11' 
+        #     except KeyError:
+        #         try: 
+        #             table.style = 'Table Grid'
+        #         except KeyError: 
+        #             pass
+
+        #     # Safe Autofit (Works across Linux and Windows)
+        #     table.autofit = True
+        #     table.allow_autofit = True
+
+        #     # Standardize fonts without breaking column width calculations
+        #     for row in table.rows:
+        #         for cell in row.cells:
+        #             for p in cell.paragraphs:
+        #                 for run in p.runs:
+        #                     run.font.name = 'Segoe UI'
+        #                     if run.font.size is None:
+        #                         run.font.size = Pt(10) # Slightly smaller font for tables prevents text wrapping issues
+
+        # ---------------------------------------------------------
+        # ROBUST TABLE FIXES (LibreOffice Friendly)
+        # ---------------------------------------------------------
+        for table in doc.tables:
+            # Set a universal style that exists in every Word/LibreOffice instance
+            table.style = 'Table Grid' 
             table.autofit = True
             table.allow_autofit = True
-
+            
             for row in table.rows:
                 for cell in row.cells:
+                    cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
                     for p in cell.paragraphs:
+                        # Ensure no weird spacing in tables
+                        p.paragraph_format.space_before = Pt(0)
+                        p.paragraph_format.space_after = Pt(0)
                         for run in p.runs:
                             run.font.name = 'Segoe UI'
-                            if run.font.size is None:
-                                run.font.size = Pt(11)
+                            run.font.size = Pt(10)
 
         doc.save(str(docx_path))
 
@@ -1454,13 +1946,54 @@ def convert_md_to_docx(md_path, docx_path, document_title, project_title, client
 # -----------------------------
 # API Endpoints
 # -----------------------------
+# @app.post("/api/upload")
+# async def upload_file(file: UploadFile = File(...), logo: UploadFile = File(None)):
+#     task_id = str(uuid.uuid4())
+#     task_dir = UPLOAD_DIR / task_id
+#     task_dir.mkdir(parents=True, exist_ok=True)
+
+#     # sanitize file names (security)
+#     src_name = safe_filename(file.filename, default="source.pptx")
+#     file_path = task_dir / f"source_{src_name}"
+
+#     with open(file_path, "wb") as f:
+#         shutil.copyfileobj(file.file, f)
+
+#     logo_path = None
+#     if logo:
+#         logo_name = safe_filename(logo.filename, default="logo")
+#         logo_path = task_dir / f"logo_{logo_name}"
+#         with open(logo_path, "wb") as f:
+#             shutil.copyfileobj(logo.file, f)
+
+#     # Generate slide thumbnails
+#     generate_slide_thumbnails(str(file_path), task_dir)
+
+#     try:
+#         preview_data = extract_preview(str(file_path), task_id)
+#     except Exception as e:
+#         return {"error": f"Failed to parse PPTX: {str(e)}"}
+
+#     update_task(task_id, {
+#         "status": "processing",
+#         "step_name": "Initializing",
+#         "progress": 5,
+#         "filename": src_name,
+#         "file_path": str(file_path),
+#         "logo_path": str(logo_path) if logo_path else None,
+#         "preview_data": preview_data
+#     })
+
+#     return {"task_id": task_id, "preview": preview_data}
+# Make sure to import BackgroundTasks from fastapi at the top of your file!
+# from fastapi import BackgroundTasks
+
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...), logo: UploadFile = File(None)):
+async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...), logo: UploadFile = File(None)):
     task_id = str(uuid.uuid4())
     task_dir = UPLOAD_DIR / task_id
     task_dir.mkdir(parents=True, exist_ok=True)
 
-    # sanitize file names (security)
     src_name = safe_filename(file.filename, default="source.pptx")
     file_path = task_dir / f"source_{src_name}"
 
@@ -1474,25 +2007,25 @@ async def upload_file(file: UploadFile = File(...), logo: UploadFile = File(None
         with open(logo_path, "wb") as f:
             shutil.copyfileobj(logo.file, f)
 
-    # Generate slide thumbnails
-    generate_slide_thumbnails(str(file_path), task_dir)
-
-    try:
-        preview_data = extract_preview(str(file_path), task_id)
-    except Exception as e:
-        return {"error": f"Failed to parse PPTX: {str(e)}"}
-
+    # Register task in DB
     update_task(task_id, {
-        "status": "processing",
-        "step_name": "Initializing",
-        "progress": 5,
-        "filename": src_name,
-        "file_path": str(file_path),
-        "logo_path": str(logo_path) if logo_path else None,
-        "preview_data": preview_data
+        "status": "processing_upload",
+        "step_name": "Saving files to Azure...",
+        "progress": 5
     })
 
-    return {"task_id": task_id, "preview": preview_data}
+    # Trigger the background worker
+    background_tasks.add_task(
+        process_initial_upload, 
+        task_id, 
+        str(file_path), 
+        str(logo_path) if logo_path else None, 
+        src_name, 
+        task_dir
+    )
+
+    # Return INSTANTLY to Next.js before Vercel times out!
+    return {"task_id": task_id, "status": "processing_upload"}
 
 
 def background_processing(task_id: str):
@@ -1551,7 +2084,8 @@ def background_processing(task_id: str):
             "progress": 85
         })
 
-        final_doc_md = write_document_sections(toc, merged)
+        # final_doc_md = write_document_sections(toc, merged)
+        final_doc_md = final_doc_md.replace(str(task_dir) + os.sep, "")
 
         md_file = task_dir / "FINAL_DESIGN_DOCUMENT.md"
         with open(md_file, "w", encoding="utf-8") as f:
@@ -1634,6 +2168,10 @@ async def get_status(task_id: str):
         response["asset_library"] = task.get("asset_library", [])
         response["page_count"] = task.get("page_count", 0)
 
+    # Add this inside get_status
+    if task.get("status") == "upload_complete":
+        response["preview_data"] = task.get("preview_data")
+        
     return response
 
 

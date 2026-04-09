@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Button, Input, Modal, Spin, FloatButton } from "antd";
+import { Button, Input, Modal, Spin, FloatButton, Tag } from "antd";
 import {
   FileWordOutlined,
   FilePdfOutlined,
@@ -22,6 +22,7 @@ export default function ReviewPage() {
   const [docName, setDocName] = useState("Generated_Design_Document");
   const [pageCount, setPageCount] = useState<number>(0);
   const [pageImages, setPageImages] = useState<string[]>([]);
+  const [costMetrics, setCostMetrics] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [isClient, setIsClient] = useState(false);
@@ -49,6 +50,7 @@ export default function ReviewPage() {
         const data = await res.json();
         setPageCount(data.page_count || 0);
         setPageImages(data.page_images || []);
+        if (data.cost_metrics) setCostMetrics(data.cost_metrics);
         setIsLoading(false);
         setIsRetrying(false);
         return; // success – exit
@@ -104,11 +106,25 @@ export default function ReviewPage() {
   // ── Download Handlers ──
   const handleDownloadDocx = () => {
     if (!taskId) return;
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    window.open(
-      `${API_BASE_URL}/api/download/${taskId}?filename=${encodeURIComponent(docName)}`,
-      "_blank"
-    );
+    Modal.info({
+      title: "Important: Viewing your Document",
+      content: (
+        <div>
+          <p>To ensure your document renders perfectly:</p>
+          <ol>
+            <li>Please open the downloaded file using <b>Microsoft Word</b> (not a web preview or Google Docs).</li>
+            <li>Upon opening, Microsoft Word will prompt you to update the fields (Table of Contents). <b>Click 'Yes'</b> to generate your final TOC.</li>
+          </ol>
+        </div>
+      ),
+      onOk() {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        window.open(
+          `${API_BASE_URL}/api/download/${taskId}?filename=${encodeURIComponent(docName)}`,
+          "_blank"
+        );
+      },
+    });
   };
 
   const handleDownloadPdf = () => {
@@ -121,8 +137,27 @@ export default function ReviewPage() {
   };
 
   const handleDownloadBoth = () => {
-    handleDownloadDocx();
-    setTimeout(() => handleDownloadPdf(), 1500);
+    if (!taskId) return;
+    Modal.info({
+      title: "Important: Viewing your Document",
+      content: (
+        <div>
+          <p>To ensure your document renders perfectly:</p>
+          <ol>
+            <li>Please open the downloaded file using <b>Microsoft Word</b> (not a web preview or Google Docs).</li>
+            <li>Upon opening, Microsoft Word will prompt you to update the fields (Table of Contents). <b>Click 'Yes'</b> to generate your final TOC.</li>
+          </ol>
+        </div>
+      ),
+      onOk() {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        window.open(
+          `${API_BASE_URL}/api/download/${taskId}?filename=${encodeURIComponent(docName)}`,
+          "_blank"
+        );
+        setTimeout(() => handleDownloadPdf(), 1500);
+      },
+    });
   };
 
   const handleStartOver = () => {
@@ -175,6 +210,11 @@ export default function ReviewPage() {
               {pageCount > 0 ? `${pageCount} Pages` : isLoading ? "Preparing\u2026" : "\u2013"}
             </span>
           </div>
+          {costMetrics && costMetrics.total_cost_myr !== undefined && (
+            <Tag color="green" className="py-1 px-3 fs-6 rounded-pill border-0 shadow-sm" style={{ fontWeight: 600 }}>
+              Estimated Generation Cost: RM {Number(costMetrics.total_cost_myr).toFixed(2)}
+            </Tag>
+          )}
         </div>
 
         <div className="d-flex gap-2">
@@ -196,7 +236,7 @@ export default function ReviewPage() {
           >
             Download PDF
           </Button>
-          <Button
+          {/* <Button
             type="primary"
             style={{ backgroundColor: "#2b5aee" }}
             onClick={handleDownloadBoth}
@@ -204,7 +244,7 @@ export default function ReviewPage() {
             disabled={isLoading}
           >
             Download Both
-          </Button>
+          </Button> */}
         </div>
       </header>
 
@@ -213,101 +253,101 @@ export default function ReviewPage() {
         className="flex-grow-1 d-flex justify-content-center py-4 px-3"
         style={{ backgroundColor: "#d6d6d6" }}
       >        {isLoading ? (
+        <div
+          className="d-flex flex-column align-items-center justify-content-center"
+          style={{ minHeight: "70vh" }}
+        >
+          <Spin indicator={<LoadingOutlined style={{ fontSize: 48 }} spin />} />
+          <p className="text-muted mt-4 fw-medium fs-5">
+            {isRetrying ? "Retrying document preview\u2026" : "Preparing document preview\u2026"}
+          </p>
+          <p className="text-muted small">
+            Converting each page to a viewable image. This may take a moment for large documents.
+          </p>
+        </div>
+      ) : loadError ? (
+        <div
+          className="d-flex flex-column align-items-center justify-content-center"
+          style={{ minHeight: "70vh" }}
+        >
           <div
-            className="d-flex flex-column align-items-center justify-content-center"
-            style={{ minHeight: "70vh" }}
-          >
-            <Spin indicator={<LoadingOutlined style={{ fontSize: 48 }} spin />} />
-            <p className="text-muted mt-4 fw-medium fs-5">
-              {isRetrying ? "Retrying document preview\u2026" : "Preparing document preview\u2026"}
-            </p>
-            <p className="text-muted small">
-              Converting each page to a viewable image. This may take a moment for large documents.
-            </p>
-          </div>
-        ) : loadError ? (
-          <div
-            className="d-flex flex-column align-items-center justify-content-center"
-            style={{ minHeight: "70vh" }}
+            className="bg-white rounded-4 shadow-sm p-5 text-center d-flex flex-column align-items-center"
+            style={{ maxWidth: "480px" }}
           >
             <div
-              className="bg-white rounded-4 shadow-sm p-5 text-center d-flex flex-column align-items-center"
-              style={{ maxWidth: "480px" }}
+              className="d-flex align-items-center justify-content-center rounded-circle mb-4"
+              style={{
+                width: "64px",
+                height: "64px",
+                backgroundColor: "#fff2f0",
+                border: "2px solid #ffccc7",
+              }}
             >
-              <div
-                className="d-flex align-items-center justify-content-center rounded-circle mb-4"
-                style={{
-                  width: "64px",
-                  height: "64px",
-                  backgroundColor: "#fff2f0",
-                  border: "2px solid #ffccc7",
-                }}
-              >
-                <WarningOutlined style={{ fontSize: "28px", color: "#ff4d4f" }} />
-              </div>
-              <h5 className="fw-bold text-dark mb-2">Preview could not be loaded</h5>
-              <p className="text-muted mb-1" style={{ fontSize: "14px" }}>
-                {loadError}
-              </p>
-              {retryCount > 0 && (
-                <p className="text-muted mb-0" style={{ fontSize: "12px" }}>
-                  Attempted {retryCount} manual {retryCount === 1 ? "retry" : "retries"}
-                </p>
-              )}
-              <Button
-                type="primary"
-                icon={<ReloadOutlined />}
-                size="large"
-                onClick={handleRetry}
-                className="mt-4"
-                style={{
-                  backgroundColor: "#2b5aee",
-                  borderRadius: "8px",
-                  fontWeight: 500,
-                  height: "44px",
-                  paddingInline: "28px",
-                }}
-              >
-                Retry Preview
-              </Button>
-              <p className="text-muted mt-3 mb-0" style={{ fontSize: "12px" }}>
-                The document was generated successfully &mdash; downloads still work even if the preview fails.
-              </p>
+              <WarningOutlined style={{ fontSize: "28px", color: "#ff4d4f" }} />
             </div>
+            <h5 className="fw-bold text-dark mb-2">Preview could not be loaded</h5>
+            <p className="text-muted mb-1" style={{ fontSize: "14px" }}>
+              {loadError}
+            </p>
+            {retryCount > 0 && (
+              <p className="text-muted mb-0" style={{ fontSize: "12px" }}>
+                Attempted {retryCount} manual {retryCount === 1 ? "retry" : "retries"}
+              </p>
+            )}
+            <Button
+              type="primary"
+              icon={<ReloadOutlined />}
+              size="large"
+              onClick={handleRetry}
+              className="mt-4"
+              style={{
+                backgroundColor: "#2b5aee",
+                borderRadius: "8px",
+                fontWeight: 500,
+                height: "44px",
+                paddingInline: "28px",
+              }}
+            >
+              Retry Preview
+            </Button>
+            <p className="text-muted mt-3 mb-0" style={{ fontSize: "12px" }}>
+              The document was generated successfully &mdash; downloads still work even if the preview fails.
+            </p>
           </div>
-        ) : pageImages.length > 0 ? (
-          <div
-            className="d-flex flex-column align-items-center gap-3"
-            style={{ maxWidth: "900px", width: "100%" }}
-          >
-            {pageImages.map((url, idx) => (
+        </div>
+      ) : pageImages.length > 0 ? (
+        <div
+          className="d-flex flex-column align-items-center gap-3"
+          style={{ maxWidth: "900px", width: "100%" }}
+        >
+          {pageImages.map((url, idx) => (
+            <div
+              key={idx}
+              className="shadow position-relative bg-white"
+              style={{ width: "100%" }}
+            >
+              <img
+                src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${url}`}
+                alt={`Page ${idx + 1}`}
+                style={{ width: "100%", display: "block" }}
+              />
               <div
-                key={idx}
-                className="shadow position-relative bg-white"
-                style={{ width: "100%" }}
+                className="position-absolute bottom-0 end-0 m-2 px-2 py-1 bg-dark bg-opacity-75 text-white rounded"
+                style={{ fontSize: "12px", pointerEvents: "none" }}
               >
-                <img
-                  src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${url}`}
-                  alt={`Page ${idx + 1}`}
-                  style={{ width: "100%", display: "block" }}
-                />
-                <div
-                  className="position-absolute bottom-0 end-0 m-2 px-2 py-1 bg-dark bg-opacity-75 text-white rounded"
-                  style={{ fontSize: "12px", pointerEvents: "none" }}
-                >
-                  Page {idx + 1} of {pageCount}
-                </div>
+                Page {idx + 1} of {pageCount}
               </div>
-            ))}
-          </div>
-        ) : (
-          <div
-            className="d-flex flex-column align-items-center justify-content-center text-muted"
-            style={{ minHeight: "70vh" }}
-          >
-            <p>No document pages available for preview.</p>
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div
+          className="d-flex flex-column align-items-center justify-content-center text-muted"
+          style={{ minHeight: "70vh" }}
+        >
+          <p>No document pages available for preview.</p>
+        </div>
+      )}
       </div>
 
       {/* ── Scroll to Top Button (Global window listener) ── */}

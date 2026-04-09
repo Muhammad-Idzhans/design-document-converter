@@ -1,7 +1,13 @@
 python-backend-development/.env
+python-backend-development/outputs
+python-backend-development/__pycache__
+
+python-backend-deployment/__pycache__
+
 extraction-output
 sample-documents
+sample-documents-output
 sample-images
-api_uploads
-__pycache__tasks_db.json
+
+
 
