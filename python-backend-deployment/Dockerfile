@@ -28,6 +28,11 @@ RUN sed -i 's/Components: main/Components: main contrib/g' /etc/apt/sources.list
     && fc-cache -f -v \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy custom Windows fonts (like Segoe UI) for high-fidelity LibreOffice rendering
+COPY fonts/ /usr/share/fonts/truetype/custom/
+RUN fc-cache -f -v
+
+
 # Copy and install Python dependencies
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt

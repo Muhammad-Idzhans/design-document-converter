@@ -213,7 +213,7 @@ export default function UploadPage() {
   }, [selectedLogo]);
 
   return (
-    <div className="container-fluid min-vh-100 bg-light d-flex flex-column align-items-center py-5">
+    <div className="container-fluid bg-light d-flex flex-column flex-grow-1 align-items-center py-4 pb-5">
       <div className="text-center mt-4 mb-5">
         <h2 className="fw-bold mb-2">Generate Design Document</h2>
         <p className="text-muted mb-0">Upload your PowerPoint architecture deck to begin.</p>

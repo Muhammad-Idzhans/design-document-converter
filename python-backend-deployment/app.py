@@ -325,35 +325,30 @@ def convert_pptx_to_pdf(pptx_path: str, pdf_path: str) -> None:
 
 
 def convert_docx_to_pdf(docx_path: str, pdf_path: str) -> None:
-    """Convert DOCX to PDF using LibreOffice headless."""
-    abs_docx = os.path.abspath(docx_path)
-    abs_pdf = os.path.abspath(pdf_path)
-    out_dir = os.path.dirname(abs_pdf)
-    soffice = _get_soffice()
-    user_profile = _make_user_profile()
-
+    """Convert DOCX to PDF using Aspose.Words for native Microsoft fidelity."""
     try:
-        subprocess.run(
-            [soffice, "--headless", "--norestore", "--nologo",
-             f"-env:UserInstallation=file:///{user_profile.replace(os.sep, '/')}",
-             "--convert-to", "pdf",
-             "--outdir", out_dir, abs_docx],
-            check=True, timeout=180,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-
-        expected_out = os.path.join(out_dir, os.path.splitext(os.path.basename(abs_docx))[0] + ".pdf")
-        if expected_out != abs_pdf and os.path.exists(expected_out):
-            os.rename(expected_out, abs_pdf)
-
+        import aspose.words as aw
+        
+        abs_docx = os.path.abspath(docx_path)
+        abs_pdf = os.path.abspath(pdf_path)
+        
+        # Load the DOCX document
+        doc = aw.Document(abs_docx)
+        
+        # Create PDF save options to ensure high quality
+        save_options = aw.saving.PdfSaveOptions()
+        save_options.display_doc_title = True
+        
+        # Save as PDF
+        doc.save(abs_pdf, save_options)
+        
         if not os.path.exists(abs_pdf):
-            raise RuntimeError("LibreOffice conversion succeeded but output PDF not found.")
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("DOCX to PDF conversion timed out (180s).")
+            raise RuntimeError("Aspose.Words conversion succeeded but output PDF not found.")
+            
+    except ImportError:
+        raise RuntimeError("aspose-words is not installed. Please run 'pip install aspose-words'")
     except Exception as e:
         raise RuntimeError(f"DOCX to PDF conversion failed: {e}")
-    finally:
-        shutil.rmtree(user_profile, ignore_errors=True)
 
 
 def _update_toc_with_libreoffice(docx_path: str) -> None:

@@ -113,7 +113,7 @@ export default function ProcessingPage() {
   });
 
   return (
-    <div className="container-fluid min-vh-100 bg-white d-flex align-items-center justify-content-center py-5">
+    <div className="container-fluid bg-white d-flex flex-grow-1 align-items-center justify-content-center py-5">
       <div
         className="card shadow-lg border-0"
         style={{ width: "100%", maxWidth: "700px", borderRadius: "16px", padding: "50px" }}
@@ -150,7 +150,7 @@ export default function ProcessingPage() {
                     backgroundColor: "#2b5aee"
                   }}
                 >
-                  View Generated Document
+                  Preview Generated Document
                 </Button>
               </div>
             )}
@@ -163,12 +163,12 @@ export default function ProcessingPage() {
             </div>
             <h3 className="fw-bold text-dark mb-2">Processing Failed</h3>
             <p className="text-muted mb-5">{errorMessage}</p>
-            <Button 
-               type="primary" 
-               danger 
-               size="large" 
-               onClick={() => router.push("/")}
-               style={{ borderRadius: "8px", padding: "0 30px" }}
+            <Button
+              type="primary"
+              danger
+              size="large"
+              onClick={() => router.push("/")}
+              style={{ borderRadius: "8px", padding: "0 30px" }}
             >
               Return to Upload
             </Button>
