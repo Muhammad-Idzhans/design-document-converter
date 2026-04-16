@@ -19,6 +19,11 @@ from fastapi.responses import FileResponse
 from pptx import Presentation
 from dotenv import load_dotenv
 
+from docx import Document
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+
 try:
     from openai import AzureOpenAI  # noqa: F401
 except ImportError:
@@ -48,11 +53,13 @@ AGENT_ASSISTANT_ID = os.getenv("AGENT_ASSISTANT_ID", "")
 # Pricing Details (USD) & Conversions
 # -----------------------------
 # Using standard pay-as-you-go Microsoft Foundry pricing for GPT-4.1
-USD_TO_MYR_RATE = float(os.getenv("USD_TO_MYR_RATE", "4.75"))
+USD_TO_MYR_RATE = float(os.getenv("USD_TO_MYR_RATE", "4.20"))
 
-# GPT-4.1 / GPT-4o Vision and Text pricing are currently unified under token count
-RATE_VISION_PROMPT = 0.002 / 1000      # GPT-4.1 Global Text/Vision input ($2 per 1M)
-RATE_VISION_COMPLETION = 0.008 / 1000  # GPT-4.1 Global Text/Vision output ($8 per 1M)
+# GPT-4o Vision Pricing
+RATE_VISION_PROMPT = 0.0025 / 1000      # GPT-4o Global Text/Vision input ($2.50 per 1M)
+RATE_VISION_COMPLETION = 0.010 / 1000   # GPT-4o Global Text/Vision output ($10 per 1M)
+
+# GPT-4.1 Text Pricing
 RATE_LLM_PROMPT = 0.002 / 1000         # GPT-4.1 Global Text input ($2 per 1M)
 RATE_LLM_COMPLETION = 0.008 / 1000     # GPT-4.1 Global Text output ($8 per 1M)
 
@@ -72,6 +79,8 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 TASKS_FILE = BASE_STORAGE / "tasks_db.json"
 TASKS_LOCK = RLock()
+
+
 
 # -----------------------------
 # LibreOffice Path Detection
@@ -324,31 +333,7 @@ def convert_pptx_to_pdf(pptx_path: str, pdf_path: str) -> None:
         shutil.rmtree(user_profile, ignore_errors=True)
 
 
-def convert_docx_to_pdf(docx_path: str, pdf_path: str) -> None:
-    """Convert DOCX to PDF using Aspose.Words for native Microsoft fidelity."""
-    try:
-        import aspose.words as aw
-        
-        abs_docx = os.path.abspath(docx_path)
-        abs_pdf = os.path.abspath(pdf_path)
-        
-        # Load the DOCX document
-        doc = aw.Document(abs_docx)
-        
-        # Create PDF save options to ensure high quality
-        save_options = aw.saving.PdfSaveOptions()
-        save_options.display_doc_title = True
-        
-        # Save as PDF
-        doc.save(abs_pdf, save_options)
-        
-        if not os.path.exists(abs_pdf):
-            raise RuntimeError("Aspose.Words conversion succeeded but output PDF not found.")
-            
-    except ImportError:
-        raise RuntimeError("aspose-words is not installed. Please run 'pip install aspose-words'")
-    except Exception as e:
-        raise RuntimeError(f"DOCX to PDF conversion failed: {e}")
+
 
 
 def _update_toc_with_libreoffice(docx_path: str) -> None:
@@ -773,55 +758,34 @@ def generate_table_of_contents(task_id: str, extraction_payload: Dict[str, Any])
 
     orchestrator_prompt = (
         "You are an Expert Enterprise Solutions Architect from Enfrasys Solutions. Your task is to analyze an extracted solution design presentation "
-        "(provided as a combined JSON payload) and produce a detailed Table of Contents (Outline) for a formal Microsoft Word Solution Design Document that follows the Enfrasys standard structure.\n\n"
+        "(provided as a combined JSON payload) and produce a detailed, bespoke Table of Contents (Outline) for a formal Microsoft Word Solution Design Document.\n\n"
         "INSTRUCTIONS:\n"
-        "1. Analyze the payload deeply: read slide text, speaker notes, and diagram descriptions to fully understand the technical context and design decisions made.\n"
-        "2. Group related slides into the standard Enfrasys architectural sections listed below. Do NOT map slides 1-to-1.\n"
-        "3. REQUIRED SECTION ORDER — Follow this exact pattern, including strict decimal numbering (e.g., 2.1, 2.2) for all sub-sections. Adapt section titles to the technology in the presentation:\n"
-        " 2.0 Executive Summary\n"
-        " Sub-sections: 2.1 Project Overview 2.2 Document Purpose 2.3 Document Audience\n"
-        " 3.0 [Technology] Overview\n"
-        " Sub-sections: 3.1 [Core Technology 1] 3.2 [Core Technology 2] (Force the Writer to generate boilerplate definitions for the core Microsoft technologies used, e.g., Fabric, M365, Entra ID).\n"
-        " 4.0 Network Design and Decision\n"
-        " Sub-sections: 4.1 Network Connectivity Overview 4.2 [Technology] Data Gateway (with VM spec table if a gateway VM exists)\n"
-        " 5.0 Roles in [Technology]\n"
-        " Sub-sections: 5.1 [Technology] Administrator Role 5.2 [Technology]-native Roles 5.3 [Client] Workspace Role and Access\n"
-        " 6.0 [Technology] Design and Decision ← This is the LARGEST section. It MUST cover ALL of the following sub-sections:\n"
-        " 6.1 [Topic] Workflow Design Considerations (table of design considerations with IDs and descriptions)\n"
-        " 6.2 [Topic] Workflow Design Decisions\n"
-        " 6.3 Access Design Considerations and Decisions (H3 per access method, plus decision table)\n"
-        " 6.4 Virtual Machine (VM) Size (table with OS, .NET, vCPU, RAM specs for any gateway/VM component)\n"
-        " 6.5 Resource Organization Design (H3: Management Groups H3: Naming and Tagging → tables: Azure Naming, [Tech] Naming, Acronyms)\n"
-        " 6.6 Governance Consideration (H3: Governance Disciplines with Cost Management table H3: Violation Triggers and Actions table)\n"
-        " 7.0 Security Design and Decision\n"
-        " Sub-sections: 7.1 Azure NSG Overview (Inbound/Outbound Rules tables) 7.2 Encryption Design\n"
-        " 8.0 Deployment & Migration Approach [If Applicable]\n"
-        " Sub-sections: 8.1 Pre-Migration/Setup 8.2 Pilot 8.3 Production 8.4 Post-Migration/Support. (Instruct the Writer to generate 'Action By' task tables and D-7/D0/D+1 timelines here).\n"
-        " 9.0 Appendix\n"
-        " Sub-sections: 9.1 Appendix 1 Computing 9.2 Appendix 2 Network 9.3 Appendix 3 Identity & Security 9.4 Appendix 4 Logging & Monitoring 9.5 Appendix 5 Cloud Governance 9.6 Appendix 6 [Tech-specific]\n"
-        " EACH appendix sub-section MUST have: 'Introduction/Prerequisites', 'Limits and Boundaries', 'Others'.\n"
-        "4. CONTENT PLACEMENT RULES:\n"
-        " - NSG rules belong in Security Design ONLY.\n"
-        " - VM specifications belong in the Design and Decision section ONLY.\n"
-        " - Naming conventions belong in Resource Organization Design ONLY.\n"
-        "5. Do NOT create standalone top-level sections for 'Microsoft Best Practices', 'Governance', or 'Naming Conventions'.\n"
-        "6. Do NOT generate Section 1.0 (Document Sign Off). Start ALL section numbering at 2.0.\n"
-        "7. Output the outline strictly as a JSON object matching this schema:\n"
+        "1. Analyze the payload deeply: read slide text, speaker notes, and diagram descriptions to fully understand the technical context, the scope of the project, and the design decisions made.\n"
+        "2. DYNAMIC MAPPING (CRITICAL): Do NOT blindly copy a static template. You must build the Table of Contents based ONLY on the actual technologies and concepts present in the payload. If the slides do not mention Virtual Machines, do not create a VM section. If they do not mention NSGs, do not create an NSG section.\n"
+        "3. REQUIRED SECTION FLOW — Follow this logical progression, adapting the specific section titles to the actual content:\n"
+        "   - 2.0 Executive Summary (CRITICAL: This section MUST contain ONLY exactly three sub-sections: Project Overview, Document Purpose, and Document Audience. Do NOT generate any other sub-sections or stakeholder tables here).\n"
+        "   - 3.0 Technology Overview (Instruct the Writer to define the core technologies mentioned in the slides, e.g., Fabric, M365, Entra ID)\n"
+        "   - 4.0 Network & Security Design (Include Sub-sections for Connectivity, Gateways, or NSGs ONLY if present in the data)\n"
+        "   - 5.0 Roles and Access (Include Sub-sections for Admin Roles, Conditional Access, or Workspace Mapping ONLY if present)\n"
+        "   - 6.0 Platform Design & Decisions (Include Sub-sections for Workflows, Resource Organization, or Data Governance ONLY if present)\n"
+        "   - 7.0 Deployment & Migration Approach (Include ONLY if the slides contain migration timelines, phases, or strategies)\n"
+        "   - X.0 Appendix (This MUST be the final section. Number it sequentially based on the last section generated. Instruct the Writer to include Limits, Boundaries, and Reference Links here).\n"
+        "4. Output the outline strictly as a JSON object matching this schema:\n"
         "{\n"
         ' "client_name": "string (Exact client name from title slide)",\n'
         ' "client_name_full": "string | null",\n'
         ' "project_title": "string",\n'
         ' "sections": [\n'
         "  {\n"
-        '   "section_number": "2.0",\n'
+        '   "section_number": "string (e.g., 2.0, 4.1)",\n'
         '   "section_title": "string",\n'
         '   "mapped_slides": [int],\n'
-        '   "generation_instructions": "string (List every H2/H3 sub-section with its exact decimal number (e.g., 2.1, 6.3), required tables WITH column names, explicit instructions to add boilerplate definitions, and instructions to assign Enfrasys vs. Client responsibilities.)"\n'
+        '   "generation_instructions": "string (List the exact required tables WITH column names if applicable, explicit instructions to add boilerplate definitions, and instructions to assign Enfrasys vs. Client responsibilities.)"\n'
         "  }\n"
         " ]\n"
         "}\n"
     )
-
+    
     payload = {
         "model": ORCHESTRATOR_DEPLOYMENT,
         "response_format": {"type": "json_object"},
@@ -864,12 +828,21 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
 
     writer_system_prompt = """
         You are a Lead Enterprise Architect from Enfrasys Solutions writing a formal Solution Design Document. Your output will be converted directly to a Microsoft Word document for a client.
-        Write in authoritative, professional language ("Enfrasys recommends", "[CLIENT_NAME] shall implement"). Be specific — reference the actual client name, technology components, and design decisions from the slide data.
+        Write in authoritative, professional language ("Enfrasys recommends", "[CLIENT_NAME] shall implement"). Be specific — reference the actual client name, technology components, and design decisions from the provided slide data.
         CRITICAL: Do NOT wrap your entire response in a ```markdown code block. Just return the raw text.
-        
-        -- CONSULTING EXPANSION RULES (CRITICAL) --
+
+        -- CONTENT DEPTH AND EXPANSION RULES (CRITICAL FOR LENGTH & QUALITY) --
+        1. PROSE BEFORE TABLES: Human consultants do not just output naked tables. For every H2 and H3 sub-section, you MUST write 2-3 comprehensive paragraphs explaining the architecture, the "why" behind the design decisions, and how it specifically benefits the client BEFORE presenting any Markdown table.
+        2. EXPAND ON SLIDE DATA: The input provided to you is extracted from PowerPoint slides. Treat these slide bullets as a brief outline. You MUST expand on these points using your expert Enterprise Architect knowledge. Detail the workflows, the security implications, and the operational benefits to make the document feel authoritative and complete.
+        3. VISUAL CONTEXT: Whenever you insert an image/diagram, you MUST write a detailed paragraph immediately preceding the image explaining what the diagram represents and how the data flows through it.
+
+        -- PLACEHOLDER PREVENTION RULES (CRITICAL) --
+        1. ZERO PLACEHOLDERS: You are STRICTLY FORBIDDEN from outputting any placeholders or template markers (e.g., [CLIENT_NAME], [specific purpose], [Specific client tasks]). If the specific information is not available in the slide data, you MUST rewrite the sentence entirely to be professional, generic, and grammatically complete without a marker (e.g., use "the client" or "the organization").
+        2. RECHECK STEP: Before outputting any text, search your draft internally for bracketed placeholders like "[". If you find any (that are not explicitly part of a Markdown URL syntax), you MUST rewrite that content immediately.
+
+        -- CONSULTING EXPANSION RULES --
         1. STATIC BOILERPLATE: Whenever you introduce a major Microsoft technology (e.g., Microsoft Fabric, Exchange Online, Entra ID, Power BI), you MUST provide a standard, formal definition of that technology before discussing the client's specific design. Do not assume the reader knows what the technology does.
-        2. RESPONSIBILITY ASSIGNMENT: In any section discussing tasks, migrations, or rollouts, you MUST explicitly assign ownership. Use "Enfrasys Solutions" for vendor tasks and "[CLIENT_NAME]" for client tasks.
+        2. RESPONSIBILITY ASSIGNMENT: In any section discussing tasks, migrations, or rollouts, you MUST explicitly assign ownership. Use "Enfrasys Solutions" for vendor tasks and the specific client name (or "the client" if unavailable) for client tasks.
         3. TIMELINES (If Applicable): If the slides mention migration waves or rollouts, automatically structure them into formal consulting timelines (e.g., Pre-Migration (D-7), Cutover (D0), Post-Migration Support (D+1)).
 
         -- MARKDOWN HEADING RULES --
@@ -879,60 +852,51 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
         - The H1 main section opening paragraph must be 1-2 sentences only. Detail goes in H2/H3 sub-sections.
 
         -- MANDATORY EXECUTION WORKFLOW --
-        You possess the Web Search tool. You MUST execute your task in the following strict sequence. Do not skip any steps.
-        1. SEARCH: You must use your Web Search tool to query MS Learn and official Microsoft forums for the latest limits, capabilities, and naming conventions for the technology mentioned. Do NOT rely entirely on your internal knowledge.
-        2. DRAFT: Write the document section based on both the slide data and the live search results.
-        3. RECHECK: Before finalizing, evaluate your draft internally. Are the technical specifications up to date based on your search? Are you following the Markdown and Table constraints?
+        You possess the Web Search tool. You MUST execute your task in the following strict sequence:
+        1. SEARCH: You must use your Web Search tool to query MS Learn and official Microsoft forums for the latest limits, capabilities, and naming conventions for the technology mentioned.
+        IMPORTANT: Do NOT paste URLs or references in the main body. Only store the results for the Appendix.
+        2. DRAFT: Write the document section based on both the slide data and the live search results, ensuring heavy prose expansion and removing all placeholders.
+        3. RECHECK: Are the technical specifications up to date based on your search? Are there any bracketed placeholders left?
         4. OUTPUT: Proceed to output the final, corrected text.
 
-        -- TABLE RULES (STRICT SCHEMA) --
-        Use Markdown tables to present all technical data. You must use the exact columns below when generating these tables:
-        - Design Considerations: columns = ID | Description | Workload Type
-        - Design Decisions: columns = No. | Design Decision | Decision
-        - Task/Migration Rollout: columns = Item | Activities | Action By | Status (Assign 'Action By' to Enfrasys or [CLIENT_NAME])
-        - Administrator capabilities: columns = Capability | Description
-        - Workspace-level role capabilities: columns = Permission | Admin | Contributor | Member | Viewer
-        - Client workspace role mapping: columns = No. | Workspace Role | Suggested Role | [CLIENT_NAME] Personnel
-        - Access decisions: columns = No. | Policy | Decision
-        - VM specifications: columns = Component | Specification
-        - NSG rules: columns = Name | Priority | Source | Source Ports | Destination | Destination Ports | Protocol | Access
-        - Azure Naming Convention: columns = Resource | Abbreviation | Example
-        - Cost Management Tools: columns = Azure Tool | Description | Cost Management Discipline
+        -- TABLE SPAM PREVENTION & SCHEMA (CRITICAL) --
+        1. DEFAULT TO BULLET POINTS: You MUST default to using standard prose and bullet points for lists of features, considerations, or technology descriptions. 
+        2. RESTRICTED TABLE USAGE: You are STRICTLY FORBIDDEN from generating a Markdown table unless the slide data is explicitly numeric, a strict matrix, or a migration schedule. 
+        3. PANDOC FORMATTING (CRITICAL): You MUST leave a completely blank empty line immediately BEFORE and AFTER every single Markdown table so the document parser renders it correctly as a grid.
+        4. TABLE SYNTAX (CRITICAL): You MUST include leading and trailing pipes (`|`) on EVERY row of the table. Example: `| Col A | Col B |`. DO NOT omit the outer edge pipes, or the parser will fail to render the grid!
+        5. NO LINE BREAKS IN CELLS (CRITICAL): You are STRICTLY FORBIDDEN from using line breaks (\n) or paragraph returns inside a table cell. All text within a single cell MUST be written as one continuous line of text, no matter how long it is.
+        6. If you do encounter strict data that requires a table, you must use these columns:
+        - Design Decisions: | No. | Design Decision | Decision |
+        - Task/Migration Rollout: | Item | Activities | Action By | Status |
+        - Workspace/Admin capabilities: | Permission | Admin | Contributor | Member | Viewer |
+        - Access decisions: | No. | Policy | Decision |
+        - VM specifications: | Component | Specification |
+        - NSG rules: | Name | Priority | Source | Source Ports | Destination | Destination Ports | Protocol | Access |
 
         -- STRICT IMAGE RULES --
         - Select only architecture diagrams, data flow diagrams, network topologies, or access/security diagrams.
         - Each UNIQUE image file_path may only be embedded ONCE across the entire document.
         - Syntax: `![](file_path)` — use the exact path from the JSON. Do NOT invent paths.
-        - CAPTION RULE: You MUST place a blank empty line between the image and its caption to separate them! 
-            Example:
-            ![](file_path)
-
-            Figure 1: High-level architecture.
-        - DO NOT copy-paste the long 'ai_description' from the JSON into the document. Keep the actual output caption extremely brief.
+        - CAPTION RULE: You MUST place a blank empty line between the image and its caption to separate them! (e.g., Figure 1: High-level architecture). Keep the caption brief.
 
         -- NO-REPETITION RULES --
         1. Each table must appear EXACTLY ONCE across the full document. If a table was in a main section, the Appendix must NOT repeat it.
-        2. NSG rules belong ONLY in the Security Design section.
-        3. VM specifications belong ONLY in the Platform Design section.
-        4. Naming convention tables belong ONLY in the Resource Organization Design sub-section.
-        
+        2. NSG rules belong ONLY in the Security Design section. VM specifications belong ONLY in the Platform Design section.
+        3. NO INTERNAL APPENDIX POINTERS: Do not write any sentences that direct the reader to the appendix, such as "Note: Please refer to the appendix..." 
+
+        ================================================================================
         -- APPENDIX FORMATTING (STRICT RULES) --
-        Each appendix entry MUST have exactly these three H3 sub-sections:
-        ### Introduction/Prerequisites
-        ### Limits and Boundaries
-        ### Others
-        ZERO EXPLANATION RULE: Do NOT write any introductory sentences, concluding remarks, or explanations in the Appendix sections. Output ONLY the headers and the links.
-        
-        CRITICAL LINK FORMATTING (READ CAREFULLY):
+        If the instructions indicate you are writing the Appendix section:
+        1. DYNAMIC NUMBERING: Its numbering MUST logically follow the preceding main section. Do NOT hardcode "9.0".
+        2. It MUST have exactly these three H3 sub-sections: `### Introduction/Prerequisites`, `### Limits and Boundaries`, `### Others`.
+        3. ZERO EXPLANATION RULE: Do NOT write any introductory sentences, concluding remarks, or explanations. Output ONLY the headers and the links.
+        4. CRITICAL LINK FORMATTING:
         - You MUST leave a blank empty line between every single link so they do not merge together into one paragraph.
         - Do NOT use bullet points (`*` or `-`).
-        - To ensure the URL is explicitly visible to the reader AND acts as a clickable hyperlink in the Word document, you MUST use the Markdown link syntax where the URL is BOTH the display text and the link destination.
-        - Use this EXACT format: Title of the Reference: [https://...](https://...)
-        
-        Example:
-        Azure Compute Overview: [https://learn.microsoft.com/en-us/azure/virtual-machines/](https://learn.microsoft.com/en-us/azure/virtual-machines/)
+        - Use this EXACT Markdown format: Title of the Reference: [https://...](https://...)
+        ================================================================================
     """
-
+    
     use_agent = False
     openai_client = None
     agent_name = ""
@@ -1426,22 +1390,27 @@ def _build_front_matter_and_toc(doc, first_p, client_name, project_title):
     p_elem_anchor = anchor_p._element
     p_elem_anchor.getparent().remove(p_elem_anchor)
 
-
 def _fix_tables(doc):
     """Enterprise-grade table fix: explicit XML borders, fixed layout, header banding.
-
-    This is the key fix for the 'scattered table' problem. We explicitly set every
-    border and column width via OxmlElement, bypassing style-based rendering which
-    breaks when LibreOffice doesn't have the referenced Word style.
+    Includes dynamic page width calculation and the LibreOffice <w:tblGrid> skeleton fix.
     """
-    from docx.shared import Pt, Inches, Emu, RGBColor
+    from docx.shared import Pt, RGBColor
     from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
     from docx.oxml.ns import qn
     from docx.oxml import OxmlElement
 
     ENFRASYS_BLUE = "4472C4"
     ENFRASYS_BLUE_LIGHT = "D6E4F0"
-    PAGE_WIDTH_EMU = Inches(6.5)  # Standard page width minus margins
+    
+    # ---------------------------------------------------------
+    # DYNAMIC WIDTH CALCULATION (Fixes the "Weird Spaces")
+    # ---------------------------------------------------------
+    # Get the actual page dimensions from the first section
+    section = doc.sections[0]
+    # Dimensions are in EMU. 1 inch = 1440 twips = 914400 EMU. 
+    # Therefore, 1 twip = 635 EMU.
+    printable_width_emu = section.page_width - section.left_margin - section.right_margin
+    PAGE_WIDTH_TWIPS = int(printable_width_emu / 635)
 
     for table in doc.tables:
         tblPr = table._tbl.tblPr
@@ -1451,14 +1420,12 @@ def _fix_tables(doc):
 
         # --- Detect if this is a signature/front-matter table ---
         is_signature_table = False
-        for row in table.rows:
-            for cell in row.cells:
+        if len(table.rows) > 0:
+            for cell in table.rows[0].cells:
                 cell_text = cell.text.lower()
                 if "prepared by:" in cell_text or "reviewed by:" in cell_text or "verified by:" in cell_text:
                     is_signature_table = True
                     break
-            if is_signature_table:
-                break
 
         # --- 1. Remove any existing borders and set explicit ones ---
         existing_borders = tblPr.find(qn('w:tblBorders'))
@@ -1476,16 +1443,33 @@ def _fix_tables(doc):
             tblBorders.append(border)
         tblPr.append(tblBorders)
 
-        # --- 2. Set table width to 100% of page ---
+        # --- 2. Set table width and align it perfectly to the margin ---
         existing_tblW = tblPr.find(qn('w:tblW'))
         if existing_tblW is not None:
             tblPr.remove(existing_tblW)
         tblW = OxmlElement('w:tblW')
-        tblW.set(qn('w:type'), 'pct')
-        tblW.set(qn('w:w'), '5000')  # 5000 = 100% in Word's percentage units
+        tblW.set(qn('w:type'), 'dxa')
+        tblW.set(qn('w:w'), str(PAGE_WIDTH_TWIPS))
         tblPr.append(tblW)
 
-        # --- 3. Set fixed table layout (prevents column collapse in LibreOffice) ---
+        # Force Left Alignment to prevent weird side spacing
+        existing_jc = tblPr.find(qn('w:jc'))
+        if existing_jc is not None:
+            tblPr.remove(existing_jc)
+        jc = OxmlElement('w:jc')
+        jc.set(qn('w:val'), 'left')
+        tblPr.append(jc)
+
+        # Strip any rogue indentation
+        existing_ind = tblPr.find(qn('w:tblInd'))
+        if existing_ind is not None:
+            tblPr.remove(existing_ind)
+        tblInd = OxmlElement('w:tblInd')
+        tblInd.set(qn('w:w'), '0')
+        tblInd.set(qn('w:type'), 'dxa')
+        tblPr.append(tblInd)
+
+        # --- 3. Set fixed table layout ---
         existing_layout = tblPr.find(qn('w:tblLayout'))
         if existing_layout is not None:
             tblPr.remove(existing_layout)
@@ -1493,28 +1477,79 @@ def _fix_tables(doc):
         tblLayout.set(qn('w:type'), 'fixed')
         tblPr.append(tblLayout)
 
-        # --- 4. Distribute column widths evenly ---
-        num_cols = len(table.columns)
+        # --- 4. Distribute column widths and build <w:tblGrid> ---
+        # Safely determine columns based on the first row to avoid merge conflicts
+        num_cols = len(table.rows[0].cells) if len(table.rows) > 0 else 0
+        
         if num_cols > 0:
-            col_width = int(PAGE_WIDTH_EMU / num_cols)
+            # Default: equal distribution
+            ratios = [1.0 / num_cols] * num_cols
+            
+            # Identify table by headers to apply organic proportional widths
+            if len(table.rows) > 0 and not is_signature_table:
+                headers = [cell.text.strip().lower() for cell in table.rows[0].cells]
+                
+                if num_cols == 3 and 'id' in headers[0] and 'description' in headers:
+                    ratios = [0.10, 0.65, 0.25]  # Design Considerations
+                elif num_cols == 3 and 'no' in headers[0] and 'decision' in headers[-1]:
+                    ratios = [0.10, 0.45, 0.45]  # Design Decisions
+                elif num_cols == 4 and 'item' in headers[0] and 'activities' in headers[1]:
+                    ratios = [0.15, 0.45, 0.20, 0.20]  # Task Rollout
+                elif num_cols == 2 and 'capability' in headers[0]:
+                    ratios = [0.30, 0.70]  # Capabilities
+                elif num_cols == 2 and 'component' in headers[0]:
+                    ratios = [0.25, 0.75]  # VM Specs
+                elif num_cols >= 8 and 'priority' in headers[1]:
+                    ratios = [0.15, 0.10, 0.15, 0.15, 0.15, 0.10, 0.10, 0.10] # NSG Rules
+            
+            # Constrain Signature Tables to not span the full page width
+            target_page_twips = PAGE_WIDTH_TWIPS
+            if is_signature_table:
+                target_page_twips = int(PAGE_WIDTH_TWIPS * 0.75) # 75% width centered look
+            
+            col_widths = [int(target_page_twips * r) for r in ratios]
+
+            # Build the new structural grid for LibreOffice
+            existing_tblGrid = table._tbl.find(qn('w:tblGrid'))
+            if existing_tblGrid is not None:
+                table._tbl.remove(existing_tblGrid)
+
+            tblGrid = OxmlElement('w:tblGrid')
+            for w in col_widths:
+                gridCol = OxmlElement('w:gridCol')
+                gridCol.set(qn('w:w'), str(w))
+                tblGrid.append(gridCol)
+
+            # tblGrid MUST be inserted strictly before the first <w:tr>
+            first_tr_idx = 0
+            for idx, child in enumerate(table._tbl):
+                if child.tag == qn('w:tr'):
+                    first_tr_idx = idx
+                    break
+            
+            if first_tr_idx > 0:
+                table._tbl.insert(first_tr_idx, tblGrid)
+            else:
+                table._tbl.append(tblGrid)
+
+            # Apply the exact explicit width to every single cell
             for row in table.rows:
                 for idx, cell in enumerate(row.cells):
                     tcPr = cell._tc.get_or_add_tcPr()
-                    # Set cell width
+                    
                     existing_tcW = tcPr.find(qn('w:tcW'))
                     if existing_tcW is not None:
                         tcPr.remove(existing_tcW)
+                        
                     tcW = OxmlElement('w:tcW')
                     tcW.set(qn('w:type'), 'dxa')
-                    tcW.set(qn('w:w'), str(int(col_width / 914)))  # Convert EMU to twips
+                    tcW.set(qn('w:w'), str(col_widths[idx]))
                     tcPr.append(tcW)
 
         # --- 5. Apply header row banding (non-signature tables only) ---
         if not is_signature_table and len(table.rows) > 0:
-            # Header row: blue background, white bold text
             for cell in table.rows[0].cells:
                 tcPr = cell._tc.get_or_add_tcPr()
-                # Remove existing shading
                 existing_shd = tcPr.find(qn('w:shd'))
                 if existing_shd is not None:
                     tcPr.remove(existing_shd)
@@ -1531,11 +1566,10 @@ def _fix_tables(doc):
                         run.font.name = 'Segoe UI'
                         run.font.size = Pt(10)
 
-            # Alternating row banding (light blue for even data rows)
             for row_idx, row in enumerate(table.rows):
                 if row_idx == 0:
-                    continue  # Skip header
-                if row_idx % 2 == 0:  # Even rows get light shading
+                    continue  
+                if row_idx % 2 == 0:  
                     for cell in row.cells:
                         tcPr = cell._tc.get_or_add_tcPr()
                         existing_shd = tcPr.find(qn('w:shd'))
@@ -1547,7 +1581,6 @@ def _fix_tables(doc):
                         shading.set(qn('w:fill'), ENFRASYS_BLUE_LIGHT)
                         tcPr.append(shading)
 
-            # Set header row to repeat on page break
             first_tr = table.rows[0]._tr
             trPr = first_tr.find(qn('w:trPr'))
             if trPr is None:
@@ -1561,15 +1594,14 @@ def _fix_tables(doc):
             for cell in row.cells:
                 cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
 
-                # Set cell margins/padding via XML
                 tcPr = cell._tc.get_or_add_tcPr()
                 tcMar = OxmlElement('w:tcMar')
                 for margin_name in ['top', 'bottom', 'left', 'right']:
                     margin = OxmlElement(f'w:{margin_name}')
-                    margin.set(qn('w:w'), '40')  # ~0.03 inches
+                    margin.set(qn('w:w'), '40')  
                     margin.set(qn('w:type'), 'dxa')
                     tcMar.append(margin)
-                # Remove existing margins first
+                
                 existing_mar = tcPr.find(qn('w:tcMar'))
                 if existing_mar is not None:
                     tcPr.remove(existing_mar)
@@ -1965,118 +1997,6 @@ async def download_doc(task_id: str, filename: str = "Enfrasys_Design_Document")
         filename=f"{filename}.docx",
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
-
-
-@app.get("/api/download-pdf/{task_id}")
-def download_pdf(task_id: str, filename: str = "Enfrasys_Design_Document"):
-    task = get_task(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Invalid task ID")
-
-    if task.get("status") != "completed":
-        raise HTTPException(status_code=400, detail="Document not ready.")
-
-    if task.get("result_pdf") and Path(task["result_pdf"]).exists():
-        return FileResponse(
-            path=task["result_pdf"],
-            filename=f"{filename}.pdf",
-            media_type="application/pdf"
-        )
-
-    docx_path = Path(task["result_docx"])
-    pdf_path = docx_path.parent / "Solution_Design_Document.pdf"
-
-    try:
-        convert_docx_to_pdf(str(docx_path.resolve()), str(pdf_path.resolve()))
-        if not pdf_path.exists():
-            raise Exception("PDF file was not created by the converter.")
-        update_task(task_id, {"result_pdf": str(pdf_path.resolve())})
-        task["result_pdf"] = str(pdf_path.resolve())
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
-
-    return FileResponse(
-        path=task["result_pdf"],
-        filename=f"{filename}.pdf",
-        media_type="application/pdf"
-    )
-
-
-@app.get("/api/prepare-preview/{task_id}")
-def prepare_preview(task_id: str):
-    task = get_task(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-
-    if task.get("status") != "completed":
-        raise HTTPException(status_code=400, detail="Task processing not completed yet")
-
-    if task.get("preview_prepared"):
-        return {
-            "page_count": task.get("page_count", 0),
-            "page_images": task.get("page_images", []),
-            "cost_metrics": task.get("cost_metrics", {})
-        }
-
-    if "result_docx" not in task:
-        raise HTTPException(status_code=404, detail="Result DOCX path not found in task")
-
-    docx_path = Path(task.get("result_docx"))
-    if not docx_path.exists():
-        raise HTTPException(status_code=404, detail="Generated DOCX not found")
-
-    task_dir = UPLOAD_DIR / task_id
-    pdf_path = task_dir / "Solution_Design_Document.pdf"
-
-    try:
-        convert_docx_to_pdf(str(docx_path.resolve()), str(pdf_path.resolve()))
-        if not pdf_path.exists():
-            raise Exception("PDF file was not created by the converter.")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Word to PDF conversion failed: {str(e)}")
-
-    pages_dir = task_dir / "doc_pages"
-    pages_dir.mkdir(parents=True, exist_ok=True)
-
-    page_image_urls = []
-    page_count = 0
-
-    try:
-        import fitz
-        pdf_doc = fitz.open(str(pdf_path))
-        page_count = len(pdf_doc)
-        for i in range(page_count):
-            page = pdf_doc[i]
-            pix = page.get_pixmap(dpi=150)
-            img_path = pages_dir / f"page_{i + 1}.jpg"
-            pix.save(str(img_path))
-            page_image_urls.append(f"/api/doc-pages/{task_id}/page_{i + 1}.jpg")
-        pdf_doc.close()
-    except ImportError:
-        raise HTTPException(status_code=500, detail="PyMuPDF not installed. pip install PyMuPDF")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"PDF to image conversion failed: {str(e)}")
-
-    update_task(task_id, {
-        "page_count": page_count,
-        "page_images": page_image_urls,
-        "result_pdf": str(pdf_path.resolve()),
-        "preview_prepared": True
-    })
-
-    return {
-        "page_count": page_count,
-        "page_images": page_image_urls,
-        "cost_metrics": task.get("cost_metrics", {})
-    }
-
-
-@app.get("/api/doc-pages/{task_id}/{filename}")
-async def get_doc_page(task_id: str, filename: str):
-    file_path = UPLOAD_DIR / task_id / "doc_pages" / filename
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Page image not found")
-    return FileResponse(str(file_path), media_type="image/jpeg")
 
 
 if __name__ == "__main__":

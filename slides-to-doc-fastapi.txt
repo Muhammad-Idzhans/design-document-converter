@@ -19,8 +19,10 @@ from fastapi.responses import FileResponse
 from pptx import Presentation
 from dotenv import load_dotenv
 
+from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 try:
     from openai import AzureOpenAI  # noqa: F401
@@ -77,6 +79,44 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 TASKS_FILE = BASE_STORAGE / "tasks_db.json"
 TASKS_LOCK = RLock()
+
+def fix_docx_for_libreoffice(doc):
+    """
+    Applies explicit XML layout properties and strips problematic tags 
+    so LibreOffice headless can render it accurately to PDF.
+    """
+    # 1. THE ENGINE PANIC FIX: Remove the TOC <w:updateFields> tag.
+    # LibreOffice headless crashes/squishes tables when forced to update fields dynamically.
+    settings = doc.settings.element
+    update_fields_tags = settings.xpath('.//w:updateFields')
+    for tag in update_fields_tags:
+        tag.getparent().remove(tag)
+
+    # 2. DEEP JUSTIFICATION: Iterate through BOTH root and table paragraphs
+    def justify_all_text(paragraphs):
+        for paragraph in paragraphs:
+            style_name = paragraph.style.name if paragraph.style else ""
+            
+            # Do not justify headings or TOC items to preserve their intended layout
+            if "Heading" in style_name or "TOC" in style_name or "toc" in style_name.lower():
+                continue
+                
+            # Do not justify image captions or paragraphs containing images
+            has_drawing = any(getattr(run._element, "drawing_lst", None) for run in paragraph.runs)
+            
+            if not has_drawing and paragraph.text.strip():
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+
+    # Apply justification to the main body paragraphs
+    justify_all_text(doc.paragraphs)
+
+    # Apply justification to paragraphs hiding inside all tables
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                justify_all_text(cell.paragraphs)
+
+    return doc
 
 # -----------------------------
 # LibreOffice Path Detection
@@ -872,172 +912,6 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
 
     final_document_markdown = f"# {toc.get('client_name', '')} {toc.get('project_title', 'Solution Design Document')}".strip() + "\n\n"
 
-    # writer_system_prompt = """
-    #     You are a Lead Enterprise Architect from Enfrasys Solutions writing a formal Solution Design Document. Your output will be converted directly to a Microsoft Word document for a client.
-    #     Write in authoritative, professional language ("Enfrasys recommends", "[CLIENT_NAME] shall implement"). Be specific — reference the actual client name, technology components, and design decisions from the slide data.
-    #     CRITICAL: Do NOT wrap your entire response in a ```markdown code block. Just return the raw text.
-        
-    #     -- CONSULTING EXPANSION RULES (CRITICAL) --
-    #     1. STATIC BOILERPLATE: Whenever you introduce a major Microsoft technology (e.g., Microsoft Fabric, Exchange Online, Entra ID, Power BI), you MUST provide a standard, formal definition of that technology before discussing the client's specific design. Do not assume the reader knows what the technology does.
-    #     2. RESPONSIBILITY ASSIGNMENT: In any section discussing tasks, migrations, or rollouts, you MUST explicitly assign ownership. Use "Enfrasys Solutions" for vendor tasks and "[CLIENT_NAME]" for client tasks.
-    #     3. TIMELINES (If Applicable): If the slides mention migration waves or rollouts, automatically structure them into formal consulting timelines (e.g., Pre-Migration (D-7), Cutover (D0), Post-Migration Support (D+1)).
-
-    #     -- MARKDOWN HEADING RULES --
-    #     - Main Sections MUST use `#` (e.g., `# 5.0 Fabric Design and Decision`).
-    #     - Sub-sections MUST use `##` (e.g., `## 5.1 Data Workflow Design Considerations`).
-    #     - Sub-sub-sections MUST use `###` (e.g., `### 5.7.1 Azure Management Group`).
-    #     - The H1 main section opening paragraph must be 1-2 sentences only. Detail goes in H2/H3 sub-sections.
-
-    #     -- MANDATORY EXECUTION WORKFLOW --
-    #     You possess the Web Search tool. You MUST execute your task in the following strict sequence. Do not skip any steps.
-    #     1. SEARCH: You must use your Web Search tool to query MS Learn and official Microsoft forums for the latest limits, capabilities, and naming conventions for the technology mentioned. Do NOT rely entirely on your internal knowledge.
-    #     2. DRAFT: Write the document section based on both the slide data and the live search results.
-    #     3. RECHECK: Before finalizing, evaluate your draft internally. Are the technical specifications up to date based on your search? Are you following the Markdown and Table constraints?
-    #     4. OUTPUT: Proceed to output the final, corrected text.
-
-    #     -- TABLE RULES (STRICT SCHEMA) --
-    #     Use Markdown tables to present all technical data. You must use the exact columns below when generating these tables:
-    #     - Design Considerations: columns = ID | Description | Workload Type
-    #     - Design Decisions: columns = No. | Design Decision | Decision
-    #     - Task/Migration Rollout: columns = Item | Activities | Action By | Status (Assign 'Action By' to Enfrasys or [CLIENT_NAME])
-    #     - Administrator capabilities: columns = Capability | Description
-    #     - Workspace-level role capabilities: columns = Permission | Admin | Contributor | Member | Viewer
-    #     - Client workspace role mapping: columns = No. | Workspace Role | Suggested Role | [CLIENT_NAME] Personnel
-    #     - Access decisions: columns = No. | Policy | Decision
-    #     - VM specifications: columns = Component | Specification
-    #     - NSG rules: columns = Name | Priority | Source | Source Ports | Destination | Destination Ports | Protocol | Access
-    #     - Azure Naming Convention: columns = Resource | Abbreviation | Example
-    #     - Cost Management Tools: columns = Azure Tool | Description | Cost Management Discipline
-
-    #     -- STRICT IMAGE RULES --
-    #     - Select only architecture diagrams, data flow diagrams, network topologies, or access/security diagrams.
-    #     - Each UNIQUE image file_path may only be embedded ONCE across the entire document.
-    #     - Syntax: `![](file_path)` — use the exact path from the JSON. Do NOT invent paths.
-    #     - CAPTION RULE: You MUST place a blank empty line between the image and its caption to separate them! 
-    #         Example:
-    #         ![](file_path)
-
-    #         Figure 1: High-level architecture.
-    #     - DO NOT copy-paste the long 'ai_description' from the JSON into the document. Keep the actual output caption extremely brief.
-
-    #     -- NO-REPETITION RULES --
-    #     1. Each table must appear EXACTLY ONCE across the full document. If a table was in a main section, the Appendix must NOT repeat it.
-    #     2. NSG rules belong ONLY in the Security Design section.
-    #     3. VM specifications belong ONLY in the Platform Design section.
-    #     4. Naming convention tables belong ONLY in the Resource Organization Design sub-section.
-        
-    #     -- APPENDIX FORMATTING (STRICT RULES) --
-    #     Each appendix entry MUST have exactly these three H3 sub-sections:
-    #     ### Introduction/Prerequisites
-    #     ### Limits and Boundaries
-    #     ### Others
-    #     ZERO EXPLANATION RULE: Do NOT write any introductory sentences, concluding remarks, or explanations in the Appendix sections. Output ONLY the headers and the links.
-        
-    #     CRITICAL LINK FORMATTING (READ CAREFULLY):
-    #     - All external reference links MUST ONLY be placed within the Appendix sections. NEVER insert reference links within the main body text or paragraphs of the document.
-    #     - You MUST NOT use line separators (`---`) or blank empty lines between links in the appendix. Place each link consecutively on the next line.
-    #     - You MUST leave a blank empty line between every single link so they do not merge together into one paragraph.
-    #     - Do NOT use bullet points (`*` or `-`).
-    #     - To ensure the URL is explicitly visible to the reader AND acts as a clickable hyperlink in the Word document, you MUST use the Markdown link syntax where the URL is BOTH the display text and the link destination.
-    #     - Use this EXACT format: Title of the Reference: [https://...](https://...)
-        
-    #     Example:
-    #     Azure Compute Overview: [https://learn.microsoft.com/en-us/azure/virtual-machines/](https://learn.microsoft.com/en-us/azure/virtual-machines/)
-    # """
-
-    # writer_system_prompt = """
-    #     You are a Lead Enterprise Architect from Enfrasys Solutions writing a formal Solution Design Document. Your output will be converted directly to a Microsoft Word document for a client.
-    #     Write in authoritative, professional language ("Enfrasys recommends", "[CLIENT_NAME] shall implement"). Be specific — reference the actual client name, technology components, and design decisions from the provided slide data.
-    #     CRITICAL: Do NOT wrap your entire response in a ```markdown code block. Just return the raw text.
-
-    #     -- CONTENT DEPTH AND EXPANSION RULES (CRITICAL FOR LENGTH & QUALITY) --
-    #     1. PROSE BEFORE TABLES: Human consultants do not just output naked tables. For every H2 and H3 sub-section, you MUST write 2-3 comprehensive paragraphs explaining the architecture, the "why" behind the design decisions, and how it specifically benefits [CLIENT_NAME] BEFORE presenting any Markdown table.
-    #     2. EXPAND ON SLIDE DATA: The input provided to you is extracted from PowerPoint slides. Treat these slide bullets as a brief outline. You MUST expand on these points using your expert Enterprise Architect knowledge. Detail the workflows, the security implications, and the operational benefits to make the document feel authoritative and complete (aiming for the depth of a 40-page consulting deliverable).
-    #     3. VISUAL CONTEXT: Whenever you insert an image/diagram, you MUST write a detailed paragraph immediately preceding the image explaining what the diagram represents and how the data flows through it.
-
-    #     -- CONSULTING EXPANSION RULES --
-    #     1. STATIC BOILERPLATE: Whenever you introduce a major Microsoft technology (e.g., Microsoft Fabric, Exchange Online, Entra ID, Power BI), you MUST provide a standard, formal definition of that technology before discussing the client's specific design. Do not assume the reader knows what the technology does.
-    #     2. RESPONSIBILITY ASSIGNMENT: In any section discussing tasks, migrations, or rollouts, you MUST explicitly assign ownership. Use "Enfrasys Solutions" for vendor tasks and "[CLIENT_NAME]" for client tasks.
-    #     3. TIMELINES (If Applicable): If the slides mention migration waves or rollouts, automatically structure them into formal consulting timelines (e.g., Pre-Migration (D-7), Cutover (D0), Post-Migration Support (D+1)).
-
-    #     -- MARKDOWN HEADING RULES --
-    #     - Main Sections MUST use `#` (e.g., `# 5.0 Fabric Design and Decision`).
-    #     - Sub-sections MUST use `##` (e.g., `## 5.1 Data Workflow Design Considerations`).
-    #     - Sub-sub-sections MUST use `###` (e.g., `### 5.7.1 Azure Management Group`).
-    #     - The H1 main section opening paragraph must be 1-2 sentences only. Detail goes in H2/H3 sub-sections.
-
-    #     ================================================================================
-    #     -- DOCUMENT ORDER & APPENDIX LOCK RULES (CRITICAL, OVERRIDES ALL OTHER RULES) --
-    #     1. DYNAMIC NUMBERING: The Appendix MUST be the absolute final main section of the document. Its numbering MUST logically follow the preceding main section. (e.g., If the last main section is 8.0, the Appendix must be "# 9.0 Appendix". If the last section is 10.0, the Appendix must be "# 11.0 Appendix"). Do NOT hardcode "9.0".
-    #     2. END-OF-DOCUMENT ONLY: You are STRICTLY FORBIDDEN from generating the Appendix until ALL other sections defined in the Table of Contents have been fully written.
-    #     3. NEVER dump reference links in the middle of the document. Internally collect them during your Web Search and hold them until the absolute end.
-    #     4. RECHECK STEP: Before outputting the Appendix heading, verify internally: "Have I finished all core technical, security, and deployment sections?" If no, STOP, finish those sections first. 
-    #     5. There must be EXACTLY ONE Appendix section in the entire output.
-    #     ================================================================================
-
-    #     -- MANDATORY EXECUTION WORKFLOW --
-    #     You possess the Web Search tool. You MUST execute your task in the following strict sequence. Do not skip any steps.
-    #     1. SEARCH: You must use your Web Search tool to query MS Learn and official Microsoft forums for the latest limits, capabilities, and naming conventions for the technology mentioned. Do NOT rely entirely on your internal knowledge.
-    #     IMPORTANT: Do NOT paste URLs or references in the main body. Only store the results for the Appendix.
-    #     2. DRAFT: Write the document section based on both the slide data and the live search results, ensuring heavy prose expansion.
-    #     3. RECHECK: Before finalizing, evaluate your draft internally. Are the technical specifications up to date based on your search? Are you following the Markdown and Table constraints? Have you prevented the Appendix from generating too early?
-    #     4. OUTPUT: Proceed to output the final, corrected text.
-
-    #     -- TABLE RULES (STRICT SCHEMA) --
-    #     Use Markdown tables to present all technical data. You must use the exact columns below when generating these tables:
-    #     - Design Considerations: columns = ID | Description | Workload Type
-    #     - Design Decisions: columns = No. | Design Decision | Decision
-    #     - Task/Migration Rollout: columns = Item | Activities | Action By | Status (Assign 'Action By' to Enfrasys or [CLIENT_NAME])
-    #     - Administrator capabilities: columns = Capability | Description
-    #     - Workspace-level role capabilities: columns = Permission | Admin | Contributor | Member | Viewer
-    #     - Client workspace role mapping: columns = No. | Workspace Role | Suggested Role | [CLIENT_NAME] Personnel
-    #     - Access decisions: columns = No. | Policy | Decision
-    #     - VM specifications: columns = Component | Specification
-    #     - NSG rules: columns = Name | Priority | Source | Source Ports | Destination | Destination Ports | Protocol | Access
-    #     - Azure Naming Convention: columns = Resource | Abbreviation | Example
-    #     - Cost Management Tools: columns = Azure Tool | Description | Cost Management Discipline
-
-    #     -- STRICT IMAGE RULES --
-    #     - Select only architecture diagrams, data flow diagrams, network topologies, or access/security diagrams.
-    #     - Each UNIQUE image file_path may only be embedded ONCE across the entire document.
-    #     - Syntax: `![](file_path)` — use the exact path from the JSON. Do NOT invent paths.
-    #     - CAPTION RULE: You MUST place a blank empty line between the image and its caption to separate them!
-    #     Example:
-    #     ![](file_path)
-
-    #     Figure 1: High-level architecture.
-    #     - DO NOT copy-paste the long 'ai_description' from the JSON into the document. Keep the actual output caption extremely brief.
-
-    #     -- NO-REPETITION RULES --
-    #     1. Each table must appear EXACTLY ONCE across the full document. If a table was in a main section, the Appendix must NOT repeat it.
-    #     2. NSG rules belong ONLY in the Security Design section.
-    #     3. VM specifications belong ONLY in the Platform Design section.
-    #     4. Naming convention tables belong ONLY in the Resource Organization Design sub-section.
-
-    #     ================================================================================
-    #     -- APPENDIX FORMATTING (STRICT RULES) --
-    #     The Appendix section MUST be at the bottom of the document and MUST appear ONCE ONLY.
-
-    #     Each appendix entry MUST have exactly these three H3 sub-sections:
-    #     ### Introduction/Prerequisites
-    #     ### Limits and Boundaries
-    #     ### Others
-
-    #     ZERO EXPLANATION RULE: Do NOT write any introductory sentences, concluding remarks, or explanations in the Appendix sections. Output ONLY the headers and the links.
-
-    #     CRITICAL LINK FORMATTING (READ CAREFULLY):
-    #     - All external reference links MUST ONLY be placed within the Appendix sections. NEVER insert reference links within the main body text or paragraphs of the document.
-    #     - You MUST NOT use line separators (`---`) or blank empty lines between links in the appendix. Place each link consecutively on the next line.
-    #     - You MUST leave a blank empty line between every single link so they do not merge together into one paragraph.
-    #     - Do NOT use bullet points (`*` or `-`).
-    #     - To ensure the URL is explicitly visible to the reader AND acts as a clickable hyperlink in the Word document, you MUST use the Markdown link syntax where the URL is BOTH the display text and the link destination.
-    #     - Use this EXACT format: Title of the Reference: [https://...](https://...)
-
-    #     Example:
-    #     Azure Compute Overview: [https://learn.microsoft.com/en-us/azure/virtual-machines/](https://learn.microsoft.com/en-us/azure/virtual-machines/)
-    #     ================================================================================
-    # """
-
     writer_system_prompt = """
         You are a Lead Enterprise Architect from Enfrasys Solutions writing a formal Solution Design Document. Your output will be converted directly to a Microsoft Word document for a client.
         Write in authoritative, professional language ("Enfrasys recommends", "[CLIENT_NAME] shall implement"). Be specific — reference the actual client name, technology components, and design decisions from the provided slide data.
@@ -1628,161 +1502,6 @@ def _build_front_matter_and_toc(doc, first_p, client_name, project_title):
     # Remove the anchor paragraph
     p_elem_anchor = anchor_p._element
     p_elem_anchor.getparent().remove(p_elem_anchor)
-
-
-# def _fix_tables(doc):
-#     """Enterprise-grade table fix: explicit XML borders, fixed layout, header banding.
-
-#     This is the key fix for the 'scattered table' problem. We explicitly set every
-#     border and column width via OxmlElement, bypassing style-based rendering which
-#     breaks when LibreOffice doesn't have the referenced Word style.
-#     """
-#     from docx.shared import Pt, Inches, Emu, RGBColor
-#     from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
-#     from docx.oxml.ns import qn
-#     from docx.oxml import OxmlElement
-
-#     ENFRASYS_BLUE = "4472C4"
-#     ENFRASYS_BLUE_LIGHT = "D6E4F0"
-#     PAGE_WIDTH_EMU = Inches(6.5)  # Standard page width minus margins
-
-#     for table in doc.tables:
-#         tblPr = table._tbl.tblPr
-#         if tblPr is None:
-#             tblPr = OxmlElement('w:tblPr')
-#             table._tbl.insert(0, tblPr)
-
-#         # --- Detect if this is a signature/front-matter table ---
-#         is_signature_table = False
-#         for row in table.rows:
-#             for cell in row.cells:
-#                 cell_text = cell.text.lower()
-#                 if "prepared by:" in cell_text or "reviewed by:" in cell_text or "verified by:" in cell_text:
-#                     is_signature_table = True
-#                     break
-#             if is_signature_table:
-#                 break
-
-#         # --- 1. Remove any existing borders and set explicit ones ---
-#         existing_borders = tblPr.find(qn('w:tblBorders'))
-#         if existing_borders is not None:
-#             tblPr.remove(existing_borders)
-
-#         tblBorders = OxmlElement('w:tblBorders')
-#         border_color = "000000" if is_signature_table else ENFRASYS_BLUE
-#         for border_name in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
-#             border = OxmlElement(f'w:{border_name}')
-#             border.set(qn('w:val'), 'single')
-#             border.set(qn('w:sz'), '4')
-#             border.set(qn('w:space'), '0')
-#             border.set(qn('w:color'), border_color)
-#             tblBorders.append(border)
-#         tblPr.append(tblBorders)
-
-#         # --- 2. Enable AutoFit Width ---
-#         existing_tblW = tblPr.find(qn('w:tblW'))
-#         if existing_tblW is not None:
-#             tblPr.remove(existing_tblW)
-#         tblW = OxmlElement('w:tblW')
-#         tblW.set(qn('w:type'), 'auto')
-#         tblW.set(qn('w:w'), '0')
-#         tblPr.append(tblW)
-
-#         # --- 3. Remove fixed layout (Allows LibreOffice to wrap text organically) ---
-#         existing_layout = tblPr.find(qn('w:tblLayout'))
-#         if existing_layout is not None:
-#             tblPr.remove(existing_layout)
-#         # By not adding w:tblLayout, MS Word defaults to 'autofit'.
-
-#         # --- 4. Distribute cell widths optimally using dxa (Like the UMS document) ---
-#         num_cols = len(table.columns)
-#         if num_cols > 0:
-#             col_width = int(PAGE_WIDTH_EMU / num_cols)
-#             for row in table.rows:
-#                 for idx, cell in enumerate(row.cells):
-#                     tcPr = cell._tc.get_or_add_tcPr()
-#                     existing_tcW = tcPr.find(qn('w:tcW'))
-#                     if existing_tcW is not None:
-#                         tcPr.remove(existing_tcW)
-#                     tcW = OxmlElement('w:tcW')
-#                     tcW.set(qn('w:type'), 'dxa')
-#                     tcW.set(qn('w:w'), str(int(col_width / 635)))  # Convert EMU to twips (1 twip = 635 EMU)
-#                     tcPr.append(tcW)
-
-
-#         # --- 5. Apply header row banding (non-signature tables only) ---
-#         if not is_signature_table and len(table.rows) > 0:
-#             # Header row: blue background, white bold text
-#             for cell in table.rows[0].cells:
-#                 tcPr = cell._tc.get_or_add_tcPr()
-#                 # Remove existing shading
-#                 existing_shd = tcPr.find(qn('w:shd'))
-#                 if existing_shd is not None:
-#                     tcPr.remove(existing_shd)
-#                 shading = OxmlElement('w:shd')
-#                 shading.set(qn('w:val'), 'clear')
-#                 shading.set(qn('w:color'), 'auto')
-#                 shading.set(qn('w:fill'), ENFRASYS_BLUE)
-#                 tcPr.append(shading)
-
-#                 for p in cell.paragraphs:
-#                     for run in p.runs:
-#                         run.font.color.rgb = RGBColor(255, 255, 255)
-#                         run.bold = True
-#                         run.font.name = 'Segoe UI'
-#                         run.font.size = Pt(10)
-
-#             # Alternating row banding (light blue for even data rows)
-#             for row_idx, row in enumerate(table.rows):
-#                 if row_idx == 0:
-#                     continue  # Skip header
-#                 if row_idx % 2 == 0:  # Even rows get light shading
-#                     for cell in row.cells:
-#                         tcPr = cell._tc.get_or_add_tcPr()
-#                         existing_shd = tcPr.find(qn('w:shd'))
-#                         if existing_shd is not None:
-#                             tcPr.remove(existing_shd)
-#                         shading = OxmlElement('w:shd')
-#                         shading.set(qn('w:val'), 'clear')
-#                         shading.set(qn('w:color'), 'auto')
-#                         shading.set(qn('w:fill'), ENFRASYS_BLUE_LIGHT)
-#                         tcPr.append(shading)
-
-#             # Set header row to repeat on page break
-#             first_tr = table.rows[0]._tr
-#             trPr = first_tr.find(qn('w:trPr'))
-#             if trPr is None:
-#                 trPr = OxmlElement('w:trPr')
-#                 first_tr.insert(0, trPr)
-#             tblHeader = OxmlElement('w:tblHeader')
-#             trPr.append(tblHeader)
-
-#         # --- 6. Cell formatting: vertical alignment, padding, fonts ---
-#         for row in table.rows:
-#             for cell in row.cells:
-#                 cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
-
-#                 # Set cell margins/padding via XML
-#                 tcPr = cell._tc.get_or_add_tcPr()
-#                 tcMar = OxmlElement('w:tcMar')
-#                 for margin_name in ['top', 'bottom', 'left', 'right']:
-#                     margin = OxmlElement(f'w:{margin_name}')
-#                     margin.set(qn('w:w'), '40')  # ~0.03 inches
-#                     margin.set(qn('w:type'), 'dxa')
-#                     tcMar.append(margin)
-#                 # Remove existing margins first
-#                 existing_mar = tcPr.find(qn('w:tcMar'))
-#                 if existing_mar is not None:
-#                     tcPr.remove(existing_mar)
-#                 tcPr.append(tcMar)
-
-#                 for p in cell.paragraphs:
-#                     p.paragraph_format.space_before = Pt(1)
-#                     p.paragraph_format.space_after = Pt(1)
-#                     for run in p.runs:
-#                         run.font.name = 'Segoe UI'
-#                         if run.font.size is None:
-#                             run.font.size = Pt(10)
 
 def _fix_tables(doc):
     """Enterprise-grade table fix: explicit XML borders, fixed layout, header banding.
@@ -2411,11 +2130,22 @@ def download_pdf(task_id: str, filename: str = "Enfrasys_Design_Document"):
 
     docx_path = Path(task["result_docx"])
     pdf_path = docx_path.parent / "Solution_Design_Document.pdf"
+    
+    # NEW: Define a temporary fixed DOCX path just for LibreOffice
+    pdf_source_doc_path = docx_path.parent / "Solution_Design_Document_for_pdf.docx"
 
     try:
-        convert_docx_to_pdf(str(docx_path.resolve()), str(pdf_path.resolve()))
+        # 1. Load the pristine DOCX, apply the fixes, and save to the temporary file
+        doc_for_pdf = Document(str(docx_path))
+        fix_docx_for_libreoffice(doc_for_pdf)
+        doc_for_pdf.save(str(pdf_source_doc_path))
+
+        # 2. Convert the FIXED temporary file to PDF
+        convert_docx_to_pdf(str(pdf_source_doc_path.resolve()), str(pdf_path.resolve()))
+        
         if not pdf_path.exists():
             raise Exception("PDF file was not created by the converter.")
+            
         update_task(task_id, {"result_pdf": str(pdf_path.resolve())})
         task["result_pdf"] = str(pdf_path.resolve())
     except Exception as e:
@@ -2453,9 +2183,19 @@ def prepare_preview(task_id: str):
 
     task_dir = UPLOAD_DIR / task_id
     pdf_path = task_dir / "Solution_Design_Document.pdf"
+    
+    # NEW: Define a temporary fixed DOCX path just for LibreOffice
+    pdf_source_doc_path = task_dir / "Solution_Design_Document_for_pdf.docx"
 
     try:
-        convert_docx_to_pdf(str(docx_path.resolve()), str(pdf_path.resolve()))
+        # 1. Load the pristine DOCX, apply the fixes, and save to the temporary file
+        doc_for_pdf = Document(str(docx_path))
+        fix_docx_for_libreoffice(doc_for_pdf)
+        doc_for_pdf.save(str(pdf_source_doc_path))
+
+        # 2. Convert the FIXED temporary file to PDF
+        convert_docx_to_pdf(str(pdf_source_doc_path.resolve()), str(pdf_path.resolve()))
+        
         if not pdf_path.exists():
             raise Exception("PDF file was not created by the converter.")
     except Exception as e:

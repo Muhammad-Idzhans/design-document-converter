@@ -8,6 +8,7 @@ extraction-output
 sample-documents
 sample-documents-output
 sample-images
+sample-testing-document
 
 slides-to-doc-fastapi.txt
 
