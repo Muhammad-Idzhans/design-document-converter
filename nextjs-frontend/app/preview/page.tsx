@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Modal, Spin } from "antd";
-import { PlayCircleOutlined, AppstoreOutlined } from "@ant-design/icons";
+import { Button, Modal, Spin, Input, Badge } from "antd";
+import { PlayCircleOutlined, AppstoreOutlined, EditOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 
 export default function PreviewPage() {
@@ -33,14 +33,28 @@ export default function PreviewPage() {
   }, []);
 
   const handleStartProcessing = async () => {
-    if (!taskId) return;
+    if (!taskId || !previewData) return;
     
     // Hit the /api/process endpoint to trigger background AI processing
     try {
+      const payload = {
+        updated_notes: previewData.slides.reduce((acc: any, slide: any) => {
+          if (slide.isEdited) {
+            acc[slide.slide_number] = slide.notes;
+          }
+          return acc;
+        }, {})
+      };
+
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${API_BASE_URL}/api/process/${taskId}`, {
-        method: "POST"
-      });
+      
+      const fetchOptions: RequestInit = { method: "POST" };
+      if (Object.keys(payload.updated_notes).length > 0) {
+        fetchOptions.headers = { "Content-Type": "application/json" };
+        fetchOptions.body = JSON.stringify(payload);
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/process/${taskId}`, fetchOptions);
       if (!res.ok) throw new Error("Failed to start processing");
       
       // Navigate to Step 3
@@ -54,6 +68,23 @@ export default function PreviewPage() {
   const openSlideModal = (slide: any) => {
     setSelectedSlide(slide);
     setIsModalOpen(true);
+  };
+
+  const handleSaveNotes = () => {
+    if (!selectedSlide) return;
+    
+    // Update local previewData state
+    const updatedSlides = previewData.slides.map((s: any) => 
+      s.slide_number === selectedSlide.slide_number ? { ...s, notes: selectedSlide.notes, isEdited: true } : s
+    );
+    
+    const newPreviewData = { ...previewData, slides: updatedSlides };
+    setPreviewData(newPreviewData);
+    
+    // Update session storage so it persists if they refresh!
+    sessionStorage.setItem("documentPreview", JSON.stringify(newPreviewData));
+    
+    setIsModalOpen(false);
   };
 
   if (!isClient) {
@@ -119,10 +150,11 @@ export default function PreviewPage() {
                 )}
                 
                 <div 
-                  className="position-absolute top-0 start-0 m-3 px-2 py-1 bg-white rounded shadow-sm"
+                  className="position-absolute top-0 start-0 m-3 px-2 py-1 bg-white rounded shadow-sm d-flex align-items-center gap-2"
                   style={{ fontSize: "11px", fontWeight: "700", opacity: 0.9 }}
                 >
                   SLIDE {slide.slide_number}
+                  {slide.isEdited && <Badge status="success" text={<span className="fw-bold" style={{fontSize: "10px", color: "#52c41a"}}>EDITED</span>} />}
                 </div>
               </div>
 
@@ -144,8 +176,11 @@ export default function PreviewPage() {
         open={isModalOpen} 
         onCancel={() => setIsModalOpen(false)}
         footer={[
-          <Button key="close" onClick={() => setIsModalOpen(false)}>
-            Close
+          <Button key="cancel" onClick={() => setIsModalOpen(false)}>
+            Cancel
+          </Button>,
+          <Button key="save" type="primary" onClick={handleSaveNotes}>
+            Save Notes
           </Button>
         ]}
         width={800}
@@ -168,10 +203,13 @@ export default function PreviewPage() {
                 )}
             </div>
             
-            <h6 className="fw-bold text-dark">Extracted Presenter Notes:</h6>
-            <div className="bg-secondary bg-opacity-10 p-3 rounded text-dark" style={{ minHeight: "80px", whiteSpace: "pre-wrap", fontSize: "14px" }}>
-              {selectedSlide.notes || "No presenter note"}
-            </div>
+            <h6 className="fw-bold text-dark mb-2">Presenter Notes (Edit to add AI Context):</h6>
+            <Input.TextArea 
+              rows={6}
+              value={selectedSlide.notes || ""}
+              onChange={(e) => setSelectedSlide({...selectedSlide, notes: e.target.value})}
+              placeholder="Add your consulting notes, decisions, or context here for the AI to read..."
+            />
           </div>
         )}
       </Modal>

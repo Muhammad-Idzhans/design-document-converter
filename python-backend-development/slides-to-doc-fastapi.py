@@ -16,8 +16,12 @@ from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from pptx import Presentation
 from dotenv import load_dotenv
+
+class ProcessRequest(BaseModel):
+    updated_notes: Optional[Dict[str, str]] = None
 
 from docx import Document
 from docx.oxml import OxmlElement
@@ -2302,6 +2306,16 @@ def background_processing(task_id: str):
 
         shutil.copy2(file_path, working_pptx_path)
         pptx_data = extract_with_pptx(working_pptx_path, task_dir)
+        
+        # Override presenter notes if user provided custom context
+        user_notes_path = task_dir / "user_notes.json"
+        if user_notes_path.exists():
+            with open(user_notes_path, "r", encoding="utf-8") as f:
+                user_notes = json.load(f)
+            for slide in pptx_data.get("slides", []):
+                s_num = str(slide["slide_number"])
+                if s_num in user_notes:
+                    slide["notes"] = user_notes[s_num]
 
         update_task(task_id, {
             "step_name": "Converting PPTX to PDF & AI Analysis",
@@ -2416,9 +2430,15 @@ async def get_thumbnail(task_id: str, filename: str):
 
 
 @app.post("/api/process/{task_id}")
-async def start_processing(task_id: str, background_tasks: BackgroundTasks):
+async def start_processing(task_id: str, background_tasks: BackgroundTasks, payload: ProcessRequest = None):
     if not get_task(task_id):
         return {"error": "Invalid task ID"}
+        
+    if payload and payload.updated_notes:
+        notes_path = UPLOAD_DIR / task_id / "user_notes.json"
+        with open(notes_path, "w", encoding="utf-8") as f:
+            json.dump(payload.updated_notes, f)
+            
     background_tasks.add_task(background_processing, task_id)
     return {"status": "started", "task_id": task_id}
 
