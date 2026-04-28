@@ -359,13 +359,13 @@ export default function UploadPage() {
               </div>
               <div>
                 <h6 className="fw-semibold mb-1">Upload Client Logo</h6>
-                <p className="text-muted small mb-0">Optional &bull; png, jpeg, jpg, svg+xml</p>
+                <p className="text-muted small mb-0">Optional &bull; png, jpeg, jpg</p>
               </div>
             </div>
 
             <Upload
               name="logo"
-              accept="image/png, image/jpeg, image/jpg, image/svg+xml"
+              accept="image/png, image/jpeg, image/jpg"
               showUploadList={false}
               beforeUpload={(file: any) => {
                 setSelectedLogo(file);

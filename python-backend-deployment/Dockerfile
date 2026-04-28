@@ -45,4 +45,4 @@ EXPOSE 8000
 
 # Start FastAPI using Uvicorn
 # IMPORTANT: If your Python file is named main.py instead of app.py, change "app:app" to "main:app"
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

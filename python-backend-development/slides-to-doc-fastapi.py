@@ -140,26 +140,27 @@ app = FastAPI(title="Design Document Generator API")
 
 # Define the exact URLs that are allowed to talk to your backend.
 # Do NOT put a trailing slash (/) at the end of the URL.
-origins = [
+base_origins = [
     "http://localhost:3000",
     "https://design-document-converter.vercel.app"
 ]
 
+def _parse_cors_origins() -> List[str]:
+    # Start with our known safe origins
+    origins = list(base_origins)
+    # Allow Azure to configure additional origins via env: CORS_ORIGINS="https://yourfrontend,https://another"
+    env_val = os.getenv("CORS_ORIGINS", "").strip()
+    if env_val:
+        origins.extend([o.strip() for o in env_val.split(",") if o.strip()])
+    return origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=_parse_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],  # Allows all HTTP methods (GET, POST, OPTIONS, etc.)
     allow_headers=["*"],  # Allows all headers (Content-Type, Authorization, etc.)
 )
-
-def _parse_cors_origins() -> List[str]:
-    # Preserve your original default behavior (localhost only),
-    # but allow Azure to configure via env: CORS_ORIGINS="https://yourfrontend,https://another"
-    env_val = os.getenv("CORS_ORIGINS", "").strip()
-    if not env_val:
-        return ["http://localhost:3000"]
-    return [o.strip() for o in env_val.split(",") if o.strip()]
 
 def process_initial_upload(task_id: str, file_path: str, logo_path: Optional[str], src_name: str, task_dir: Path):
     try:
@@ -196,13 +197,7 @@ def process_initial_upload(task_id: str, file_path: str, logo_path: Optional[str
             "error": str(e)
         })
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_parse_cors_origins(),
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# (Middleware configuration unified above)
 
 # -----------------------------
 # Startup diagnostic (kept as-is, safer behavior)

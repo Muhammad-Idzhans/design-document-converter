@@ -16,8 +16,12 @@ from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from pptx import Presentation
 from dotenv import load_dotenv
+
+class ProcessRequest(BaseModel):
+    updated_notes: Optional[Dict[str, str]] = None
 
 from docx import Document
 from docx.oxml import OxmlElement
@@ -136,26 +140,27 @@ app = FastAPI(title="Design Document Generator API")
 
 # Define the exact URLs that are allowed to talk to your backend.
 # Do NOT put a trailing slash (/) at the end of the URL.
-origins = [
+base_origins = [
     "http://localhost:3000",
     "https://design-document-converter.vercel.app"
 ]
 
+def _parse_cors_origins() -> List[str]:
+    # Start with our known safe origins
+    origins = list(base_origins)
+    # Allow Azure to configure additional origins via env: CORS_ORIGINS="https://yourfrontend,https://another"
+    env_val = os.getenv("CORS_ORIGINS", "").strip()
+    if env_val:
+        origins.extend([o.strip() for o in env_val.split(",") if o.strip()])
+    return origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=_parse_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],  # Allows all HTTP methods (GET, POST, OPTIONS, etc.)
     allow_headers=["*"],  # Allows all headers (Content-Type, Authorization, etc.)
 )
-
-def _parse_cors_origins() -> List[str]:
-    # Preserve your original default behavior (localhost only),
-    # but allow Azure to configure via env: CORS_ORIGINS="https://yourfrontend,https://another"
-    env_val = os.getenv("CORS_ORIGINS", "").strip()
-    if not env_val:
-        return ["http://localhost:3000"]
-    return [o.strip() for o in env_val.split(",") if o.strip()]
 
 def process_initial_upload(task_id: str, file_path: str, logo_path: Optional[str], src_name: str, task_dir: Path):
     try:
@@ -192,13 +197,7 @@ def process_initial_upload(task_id: str, file_path: str, logo_path: Optional[str
             "error": str(e)
         })
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_parse_cors_origins(),
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# (Middleware configuration unified above)
 
 # -----------------------------
 # Startup diagnostic (kept as-is, safer behavior)
@@ -1835,6 +1834,16 @@ def background_processing(task_id: str):
 
         shutil.copy2(file_path, working_pptx_path)
         pptx_data = extract_with_pptx(working_pptx_path, task_dir)
+        
+        # Override presenter notes if user provided custom context
+        user_notes_path = task_dir / "user_notes.json"
+        if user_notes_path.exists():
+            with open(user_notes_path, "r", encoding="utf-8") as f:
+                user_notes = json.load(f)
+            for slide in pptx_data.get("slides", []):
+                s_num = str(slide["slide_number"])
+                if s_num in user_notes:
+                    slide["notes"] = user_notes[s_num]
 
         update_task(task_id, {
             "step_name": "Converting PPTX to PDF & AI Analysis",
@@ -1949,9 +1958,15 @@ async def get_thumbnail(task_id: str, filename: str):
 
 
 @app.post("/api/process/{task_id}")
-async def start_processing(task_id: str, background_tasks: BackgroundTasks):
+async def start_processing(task_id: str, background_tasks: BackgroundTasks, payload: ProcessRequest = None):
     if not get_task(task_id):
         return {"error": "Invalid task ID"}
+        
+    if payload and payload.updated_notes:
+        notes_path = UPLOAD_DIR / task_id / "user_notes.json"
+        with open(notes_path, "w", encoding="utf-8") as f:
+            json.dump(payload.updated_notes, f)
+            
     background_tasks.add_task(background_processing, task_id)
     return {"status": "started", "task_id": task_id}
 
