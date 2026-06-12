@@ -40,10 +40,15 @@ jobs:
       - name: Build Next.js App
         run: npm run build
 
+      - name: Prepare standalone package
+        run: |
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public .next/standalone/public
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           slot-name: "Production"
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_9ABE9E4CDA4A47E3839DA42C7CA16907 }}
-          package: nextjs-frontend
+          package: nextjs-frontend/.next/standalone
