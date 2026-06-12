@@ -44,6 +44,7 @@ jobs:
         run: |
           cp -r .next/static .next/standalone/.next/static
           cp -r public .next/standalone/public
+          cd .next/standalone && npm pkg set scripts.start="node server.js"
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
