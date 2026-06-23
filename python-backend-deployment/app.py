@@ -1390,6 +1390,7 @@ def _build_front_matter_and_toc(doc, first_p, client_name, project_title):
     p_elem_anchor = anchor_p._element
     p_elem_anchor.getparent().remove(p_elem_anchor)
 
+
 def _fix_tables(doc):
     """Enterprise-grade table fix: explicit XML borders, fixed layout, header banding.
     Includes dynamic page width calculation and the LibreOffice <w:tblGrid> skeleton fix.
@@ -1620,6 +1621,7 @@ def _fix_typography_and_captions(doc):
     """Enforce global font, heading sizes, caption styling, page breaks, and text justification."""
     from docx.shared import Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml import OxmlElement
 
     style_rules = {
         'Heading 1': {'size': 15, 'bold': False},
@@ -1677,6 +1679,7 @@ def _fix_typography_and_captions(doc):
         # --- D. ENFORCE TYPOGRAPHY SCALING ---
         style_name = para.style.name
         rule = style_rules.get(style_name)
+
         for run in para.runs:
             run.font.name = 'Segoe UI'
             if rule:
@@ -1685,6 +1688,27 @@ def _fix_typography_and_captions(doc):
             else:
                 if run.font.size is None:
                     run.font.size = Pt(11)
+
+    # --- E. INSERT BLANK LINE BEFORE SUBHEADINGS ---
+    # Rule: Insert a blank paragraph before H2/H3/H4 UNLESS the nearest
+    # preceding heading is the direct parent (e.g., H1→H2, H2→H3).
+    heading_styles = {'Heading 1', 'Heading 2', 'Heading 3', 'Heading 4'}
+    parent_of = {'Heading 2': 'Heading 1', 'Heading 3': 'Heading 2', 'Heading 4': 'Heading 3'}
+    all_paragraphs = list(doc.paragraphs)
+
+    for i, p in enumerate(all_paragraphs):
+        if p.style.name not in parent_of:
+            continue
+        # Find the nearest preceding heading
+        prev_heading_style = None
+        for j in range(i - 1, -1, -1):
+            if all_paragraphs[j].style.name in heading_styles:
+                prev_heading_style = all_paragraphs[j].style.name
+                break
+        # Skip if the previous heading is the direct parent
+        if prev_heading_style == parent_of[p.style.name]:
+            continue
+        p._element.addprevious(OxmlElement('w:p'))
 
 
 def _fix_images(doc):
@@ -1707,6 +1731,27 @@ def _fix_images(doc):
             ratio = max_height / float(shape.height)
             shape.height = max_height
             shape.width = int(shape.width * ratio)
+
+
+def _strip_heading_numbers(doc):
+    """Remove hardcoded section numbers from headings so Word's multilevel list numbering takes over."""
+    import re
+    for para in doc.paragraphs:
+        if para.style.name in ('Heading 1', 'Heading 2', 'Heading 3', 'Heading 4'):
+            text = para.text
+            match = re.match(r'^(\d+(\.\d+)+\s+)', text)
+            if match:
+                to_remove = len(match.group(1))
+                for run in para.runs:
+                    if to_remove <= 0:
+                        break
+                    run_len = len(run.text)
+                    if run_len <= to_remove:
+                        to_remove -= run_len
+                        run.text = ""
+                    else:
+                        run.text = run.text[to_remove:]
+                        to_remove = 0
 
 
 def convert_md_to_docx(md_path, docx_path, document_title, project_title, client_name, client_logo_path=None):
@@ -1746,6 +1791,7 @@ def convert_md_to_docx(md_path, docx_path, document_title, project_title, client
         _fix_images(doc)
         _fix_tables(doc)
         _fix_typography_and_captions(doc)
+        _strip_heading_numbers(doc)
 
         # Save intermediate DOCX
         doc.save(str(docx_path))
