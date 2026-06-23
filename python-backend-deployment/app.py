@@ -142,7 +142,8 @@ app = FastAPI(title="Design Document Generator API")
 # Do NOT put a trailing slash (/) at the end of the URL.
 base_origins = [
     "http://localhost:3000",
-    "https://design-document-converter.vercel.app"
+    "https://design-document-converter.vercel.app",
+    "https://design-document-converter.azurewebsites.net"
 ]
 
 def _parse_cors_origins() -> List[str]:
