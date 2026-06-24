@@ -996,7 +996,7 @@ export default function ReviewPage() {
   useEffect(() => {
     setIsClient(true);
     const storedTaskId = sessionStorage.getItem("documentTaskId");
-    const storedPreviewText = sessionStorage.getItem("documentPreviewData");
+    const storedPreviewText = sessionStorage.getItem("documentPreview");
 
     if (storedPreviewText) {
       try {
@@ -1004,7 +1004,11 @@ export default function ReviewPage() {
         let rawName = preview.filename || "Generated_Design_Document";
         if (rawName.startsWith("source_")) rawName = rawName.substring(7);
         if (rawName.toLowerCase().endsWith(".pptx")) rawName = rawName.slice(0, -5);
-        setDocName(`${rawName}_generated`);
+
+        // Remove spaces and hyphens, and ensure no multiple consecutive underscores
+        rawName = rawName.replace(/[\s-]/g, "_").replace(/_+/g, "_");
+
+        setDocName(`generated_${rawName}`);
       } catch (e) {
         console.error(e);
       }
@@ -1106,7 +1110,7 @@ export default function ReviewPage() {
           visibilityHeight={300}
           type="primary"
           shape="circle"
-          style={{ right: 400, bottom: 40, zIndex: 9999, width: "50px", height: "50px" }}
+          style={{ right: 500, bottom: 40, zIndex: 9999, width: "50px", height: "50px" }}
         />
       </div>
 
@@ -1114,8 +1118,8 @@ export default function ReviewPage() {
       <div
         className="bg-white shadow-lg d-flex flex-column"
         style={{
-          width: "360px",
-          minWidth: "360px",
+          width: "440px",
+          minWidth: "440px",
           height: "100%",
           overflowY: "auto",
           zIndex: 10
@@ -1136,6 +1140,7 @@ export default function ReviewPage() {
               value={docName}
               onChange={(e) => setDocName(e.target.value)}
               suffix={<EditOutlined className="text-muted" />}
+              addonAfter={<span style={{ fontWeight: 500, color: "#666" }}>.docx</span>}
               style={{ fontWeight: 500 }}
             />
           </div>

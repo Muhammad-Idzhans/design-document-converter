@@ -765,10 +765,31 @@ def generate_table_of_contents(task_id: str, extraction_payload: Dict[str, Any])
         "3. REQUIRED SECTION FLOW — Follow this logical progression, adapting the specific section titles to the actual content:\n"
         "   - 2.0 Executive Summary (CRITICAL: This section MUST contain ONLY exactly three sub-sections: Project Overview, Document Purpose, and Document Audience. Do NOT generate any other sub-sections or stakeholder tables here).\n"
         "   - 3.0 Discovery & Risk Assessment (CONDITIONAL — Read these rules carefully):\n"
-        "       DETECTION: Search the slide data for slides titled 'Assessment Outcome', 'Assessment Outcomes', 'Current State', 'Risk and Mitigation', or slides with titles starting with 'Risk #'.\n"
+        "       DETECTION: Search the slide data for slides titled 'Assessment Outcome', 'Assessment Outcomes', 'Current State', 'Risk and Mitigation', 'Design Constraints', or slides with titles starting with 'Risk #', OR slides containing a multi-row risk/constraint table.\n"
         "       SCENARIO A (Both assessment AND risk slides found): Create section '3.0 Discovery & Risk Assessment' with two sub-sections:\n"
         "           - 3.1 Assessment Outcome: Instruct the Writer to summarize the current environment assessment findings, including any inventory/discovery tables from the slides.\n"
-        "           - 3.2 Risk and Mitigation: Instruct the Writer to document each identified risk as its own separate sub-sub-section (e.g., ### Risk #1 Title, ### Risk #2 Title). For EACH risk, use a vertical 2-column table with these rows: | Problem Description | [detail] | then | Impact if Not Remediated | [detail] | then | Required Action | [detail] | then | Action By | [detail] |. This keeps the table narrow and readable instead of a single wide horizontal table.\n"
+        "           - 3.2 Risk and Mitigation: BEFORE writing this sub-section, detect which RISK FORMAT the slides use:\n"
+        "\n"
+        "               FORMAT A — Per-Risk Slides: If the slides contain MULTIPLE separate slides each titled 'Risk #1', 'Risk #2', etc., with their own 2-column Problem/Impact/Action/By table → instruct the Writer to document each risk as its own H3 sub-sub-section (### Risk #1 Title, ### Risk #2 Title). For EACH risk, generate a horizontal Markdown table with this EXACT format:\n"
+        "                   | Field | Detail |\n"
+        "                   |---|---|\n"
+        "                   | Problem Description | [actual detail from slides] |\n"
+        "                   | Impact if Not Remediated | [actual detail from slides] |\n"
+        "                   | Required Action | [actual detail from slides] |\n"
+        "                   | Action By | [actual entity from slides] |\n"
+        "\n"
+        "               FORMAT B — Consolidated Risk Table: If the slides contain ONE SINGLE slide with a multi-row risk/constraint table (e.g., columns like 'No', 'Constraint/Risk', 'Risk Level', 'Approach/Mitigation') → instruct the Writer to produce ONE top-header Markdown table that preserves the ORIGINAL PPTX column headers EXACTLY. Do NOT force the Problem/Impact/Action/By format. Do NOT split into per-risk sub-sections. Example:\n"
+        "                   | No | Constraint / Risk Identified | Risk Level | Approach / Mitigation |\n"
+        "                   |---|---|---|---|\n"
+        "                   | 1 | [from slides] | [from slides] | [from slides] |\n"
+        "                   | 2 | [from slides] | [from slides] | [from slides] |\n"
+        "\n"
+        "               FORMAT C — Prose/Bullets Only: If risks are described only in bullet points or prose (no table) → instruct the Writer to output a numbered list with 1-2 sentences of consulting expansion for each risk.\n"
+        "\n"
+        "           CRITICAL TABLE SYNTAX RULES (apply to whichever format is chosen):\n"
+        "               - The header row AND the '|---|---|' separator row are MANDATORY. Without them, the table will render as plain text.\n"
+        "               - Every row MUST have leading and trailing pipes (`|`).\n"
+        "               - Do NOT mix formats. Pick ONE format based on the slide data and stick with it.\n"
         "       SCENARIO B (ONLY assessment slides found, NO risk slides): Create section '3.0 Assessment Outcome' with NO sub-sections. Instruct the Writer to write all assessment content directly under this heading.\n"
         "       SCENARIO C (ONLY risk slides found, NO assessment slides): Create section '3.0 Risk and Mitigation' with NO sub-sections. Instruct the Writer to write all risk content directly under this heading.\n"
         "       SCENARIO D (NEITHER assessment NOR risk slides found): SKIP this section entirely. Start the next section at 3.0 instead.\n"
@@ -1437,6 +1458,22 @@ def _fix_tables(doc):
                     is_signature_table = True
                     break
 
+        # --- Detect if this is a horizontal column table (section 3.0 style) ---
+        # These tables have labels in the LEFT column instead of a top header row.
+        # They are identified by having 2 columns and known left-column labels.
+        is_horizontal_table = False
+        num_cols = len(table.rows[0].cells) if len(table.rows) > 0 else 0
+        horizontal_header_keywords = [
+            "field", "exchange version", "policy setting",
+            "problem description", "total user", "shared",
+            "total mailbox", "smtp relay", "mail flow",
+            "public folders", "exchange rules", "outlook client"
+        ]
+        if num_cols == 2 and not is_signature_table and len(table.rows) > 0:
+            first_cell_text = table.rows[0].cells[0].text.strip().lower()
+            if any(kw in first_cell_text for kw in horizontal_header_keywords):
+                is_horizontal_table = True
+
         # --- 1. Remove any existing borders and set explicit ones ---
         existing_borders = tblPr.find(qn('w:tblBorders'))
         if existing_borders is not None:
@@ -1488,8 +1525,7 @@ def _fix_tables(doc):
         tblPr.append(tblLayout)
 
         # --- 4. Distribute column widths and build <w:tblGrid> ---
-        # Safely determine columns based on the first row to avoid merge conflicts
-        num_cols = len(table.rows[0].cells) if len(table.rows) > 0 else 0
+        # num_cols was already computed above during horizontal table detection
         
         if num_cols > 0:
             # Default: equal distribution
@@ -1511,6 +1547,10 @@ def _fix_tables(doc):
                     ratios = [0.25, 0.75]  # VM Specs
                 elif num_cols >= 8 and 'priority' in headers[1]:
                     ratios = [0.15, 0.10, 0.15, 0.15, 0.15, 0.10, 0.10, 0.10] # NSG Rules
+
+            # Horizontal column tables get a 35/65 split
+            if is_horizontal_table:
+                ratios = [0.35, 0.65]
             
             # Constrain Signature Tables to not span the full page width
             target_page_twips = PAGE_WIDTH_TWIPS
@@ -1556,48 +1596,96 @@ def _fix_tables(doc):
                     tcW.set(qn('w:w'), str(col_widths[idx]))
                     tcPr.append(tcW)
 
-        # --- 5. Apply header row banding (non-signature tables only) ---
+        # --- 5. Apply table styling ---
         if not is_signature_table and len(table.rows) > 0:
-            for cell in table.rows[0].cells:
-                tcPr = cell._tc.get_or_add_tcPr()
-                existing_shd = tcPr.find(qn('w:shd'))
-                if existing_shd is not None:
-                    tcPr.remove(existing_shd)
-                shading = OxmlElement('w:shd')
-                shading.set(qn('w:val'), 'clear')
-                shading.set(qn('w:color'), 'auto')
-                shading.set(qn('w:fill'), ENFRASYS_BLUE)
-                tcPr.append(shading)
 
-                for p in cell.paragraphs:
-                    for run in p.runs:
-                        run.font.color.rgb = RGBColor(255, 255, 255)
-                        run.bold = True
-                        run.font.name = 'Segoe UI'
-                        run.font.size = Pt(10)
+            if is_horizontal_table:
+                # --- HORIZONTAL COLUMN TABLE STYLING (Section 3.0) ---
+                # The first row is a dummy "Field | Detail" header required by Markdown.
+                # Remove it so the table starts with actual data rows.
+                if len(table.rows) > 1:
+                    header_row_text = table.rows[0].cells[0].text.strip().lower()
+                    if header_row_text == "field":
+                        table._tbl.remove(table.rows[0]._tr)
 
-            for row_idx, row in enumerate(table.rows):
-                if row_idx == 0:
-                    continue  
-                if row_idx % 2 == 0:  
-                    for cell in row.cells:
-                        tcPr = cell._tc.get_or_add_tcPr()
-                        existing_shd = tcPr.find(qn('w:shd'))
-                        if existing_shd is not None:
-                            tcPr.remove(existing_shd)
-                        shading = OxmlElement('w:shd')
-                        shading.set(qn('w:val'), 'clear')
-                        shading.set(qn('w:color'), 'auto')
-                        shading.set(qn('w:fill'), ENFRASYS_BLUE_LIGHT)
-                        tcPr.append(shading)
+                # Style LEFT column (col 0) with blue bg + white bold text for ALL rows
+                # Style RIGHT column (col 1) with alternating bands
+                for row_idx, row in enumerate(table.rows):
+                    # Left cell: blue background, white bold text
+                    left_cell = row.cells[0]
+                    left_tcPr = left_cell._tc.get_or_add_tcPr()
+                    existing_shd = left_tcPr.find(qn('w:shd'))
+                    if existing_shd is not None:
+                        left_tcPr.remove(existing_shd)
+                    shading = OxmlElement('w:shd')
+                    shading.set(qn('w:val'), 'clear')
+                    shading.set(qn('w:color'), 'auto')
+                    shading.set(qn('w:fill'), ENFRASYS_BLUE)
+                    left_tcPr.append(shading)
+                    for p in left_cell.paragraphs:
+                        for run in p.runs:
+                            run.font.color.rgb = RGBColor(255, 255, 255)
+                            run.bold = True
+                            run.font.name = 'Segoe UI'
+                            run.font.size = Pt(10)
 
-            first_tr = table.rows[0]._tr
-            trPr = first_tr.find(qn('w:trPr'))
-            if trPr is None:
-                trPr = OxmlElement('w:trPr')
-                first_tr.insert(0, trPr)
-            tblHeader = OxmlElement('w:tblHeader')
-            trPr.append(tblHeader)
+                    # Right cell: alternating light blue band
+                    right_cell = row.cells[1]
+                    right_tcPr = right_cell._tc.get_or_add_tcPr()
+                    existing_shd_r = right_tcPr.find(qn('w:shd'))
+                    if existing_shd_r is not None:
+                        right_tcPr.remove(existing_shd_r)
+                    if row_idx % 2 == 0:
+                        shading_r = OxmlElement('w:shd')
+                        shading_r.set(qn('w:val'), 'clear')
+                        shading_r.set(qn('w:color'), 'auto')
+                        shading_r.set(qn('w:fill'), ENFRASYS_BLUE_LIGHT)
+                        right_tcPr.append(shading_r)
+
+                # Do NOT add <w:tblHeader> for horizontal tables (no repeating header)
+
+            else:
+                # --- NORMAL TABLE STYLING (top row = header) ---
+                for cell in table.rows[0].cells:
+                    tcPr = cell._tc.get_or_add_tcPr()
+                    existing_shd = tcPr.find(qn('w:shd'))
+                    if existing_shd is not None:
+                        tcPr.remove(existing_shd)
+                    shading = OxmlElement('w:shd')
+                    shading.set(qn('w:val'), 'clear')
+                    shading.set(qn('w:color'), 'auto')
+                    shading.set(qn('w:fill'), ENFRASYS_BLUE)
+                    tcPr.append(shading)
+
+                    for p in cell.paragraphs:
+                        for run in p.runs:
+                            run.font.color.rgb = RGBColor(255, 255, 255)
+                            run.bold = True
+                            run.font.name = 'Segoe UI'
+                            run.font.size = Pt(10)
+
+                for row_idx, row in enumerate(table.rows):
+                    if row_idx == 0:
+                        continue
+                    if row_idx % 2 == 0:
+                        for cell in row.cells:
+                            tcPr = cell._tc.get_or_add_tcPr()
+                            existing_shd = tcPr.find(qn('w:shd'))
+                            if existing_shd is not None:
+                                tcPr.remove(existing_shd)
+                            shading = OxmlElement('w:shd')
+                            shading.set(qn('w:val'), 'clear')
+                            shading.set(qn('w:color'), 'auto')
+                            shading.set(qn('w:fill'), ENFRASYS_BLUE_LIGHT)
+                            tcPr.append(shading)
+
+                first_tr = table.rows[0]._tr
+                trPr = first_tr.find(qn('w:trPr'))
+                if trPr is None:
+                    trPr = OxmlElement('w:trPr')
+                    first_tr.insert(0, trPr)
+                tblHeader = OxmlElement('w:tblHeader')
+                trPr.append(tblHeader)
 
         # --- 6. Cell formatting: vertical alignment, padding, fonts ---
         for row in table.rows:
@@ -2046,7 +2134,10 @@ async def get_status(task_id: str):
 
     # Add this inside get_status
     if task.get("status") == "upload_complete":
-        response["preview_data"] = task.get("preview_data")
+        preview = task.get("preview_data", {})
+        if isinstance(preview, dict) and "filename" not in preview:
+            preview["filename"] = task.get("filename")
+        response["preview_data"] = preview
 
     if "cost_metrics" in task:
         response["cost_metrics"] = task["cost_metrics"]
@@ -2055,7 +2146,7 @@ async def get_status(task_id: str):
 
 
 @app.get("/api/download/{task_id}")
-async def download_doc(task_id: str, filename: str = "Enfrasys_Design_Document"):
+async def download_doc(task_id: str, filename: str = None):
     task = get_task(task_id)
     if not task:
         return {"error": "Invalid task ID"}
@@ -2063,9 +2154,12 @@ async def download_doc(task_id: str, filename: str = "Enfrasys_Design_Document")
     if task.get("status") != "completed" or "result_docx" not in task:
         return {"error": "Document not ready or generation failed."}
 
+    # Use the filename provided by the frontend, or fallback to a default
+    final_filename = filename if filename else "generated_design_document"
+
     return FileResponse(
         path=task["result_docx"],
-        filename=f"{filename}.docx",
+        filename=f"{final_filename}.docx",
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
 
