@@ -798,6 +798,7 @@ def generate_table_of_contents(task_id: str, extraction_payload: Dict[str, Any])
         "   - Next: Network & Security Design (Include Sub-sections for Connectivity, Gateways, or NSGs ONLY if present in the data)\n"
         "   - Next: Roles and Access (Include Sub-sections for Admin Roles, Conditional Access, or Workspace Mapping ONLY if present)\n"
         "   - Next: Platform Design & Decisions (Include Sub-sections for Workflows, Resource Organization, or Data Governance ONLY if present)\n"
+        "       SPECIAL HANDLING FOR MULTI-PART SETTINGS TABLES: If the slides contain multiple parts of the same settings table (e.g., 'Settings Part 1/4', 'Settings Part 2/4', 'Settings Part 3/4', 'Settings Part 4/4', or 'Meetings Settings 1/7' through 'Meetings Settings 7/7'), you MUST create a SEPARATE sub-section for EACH part. Do NOT combine multiple parts into one mega-section. For example, if there are 7 parts of Meetings Settings, create 7 sub-sections (e.g., '6.X.1 Meetings Settings (Part 1 of 7)', '6.X.2 Meetings Settings (Part 2 of 7)', etc.). In the generation_instructions for each sub-section, explicitly state: 'Reproduce the policy/settings table from this slide EXACTLY as written. Do not paraphrase or summarize. Apply the FAITHFUL TRANSCRIPTION RULE.'\n"
         "   - Next: Deployment & Migration Approach (Include ONLY if the slides contain migration timelines, phases, or strategies)\n"
         "   - X.0 Appendix (This MUST be the final section. Number it sequentially based on the last section generated. Instruct the Writer to include Limits, Boundaries, and Reference Links here).\n"
         "4. Output the outline strictly as a JSON object matching this schema:\n"
@@ -823,7 +824,8 @@ def generate_table_of_contents(task_id: str, extraction_payload: Dict[str, Any])
             {"role": "system", "content": orchestrator_prompt},
             {"role": "user", "content": json.dumps(extraction_payload, default=str)}
         ],
-        "temperature": 0.2
+        "temperature": 0.2,
+        "max_tokens": 16384
     }
 
     try:
@@ -890,18 +892,41 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
         4. OUTPUT: Proceed to output the final, corrected text.
 
         -- TABLE SPAM PREVENTION & SCHEMA (CRITICAL) --
-        1. DEFAULT TO BULLET POINTS: You MUST default to using standard prose and bullet points for lists of features, considerations, or technology descriptions. 
-        2. RESTRICTED TABLE USAGE: You are STRICTLY FORBIDDEN from generating a Markdown table unless the slide data is explicitly numeric, a strict matrix, or a migration schedule. 
-        3. PANDOC FORMATTING (CRITICAL): You MUST leave a completely blank empty line immediately BEFORE and AFTER every single Markdown table so the document parser renders it correctly as a grid.
-        4. TABLE SYNTAX (CRITICAL): You MUST include leading and trailing pipes (`|`) on EVERY row of the table. Example: `| Col A | Col B |`. DO NOT omit the outer edge pipes, or the parser will fail to render the grid!
-        5. NO LINE BREAKS IN CELLS (CRITICAL): You are STRICTLY FORBIDDEN from using line breaks (\n) or paragraph returns inside a table cell. All text within a single cell MUST be written as one continuous line of text, no matter how long it is.
-        6. If you do encounter strict data that requires a table, you must use these columns:
-        - Design Decisions: | No. | Design Decision | Decision |
-        - Task/Migration Rollout: | Item | Activities | Action By | Status |
-        - Workspace/Admin capabilities: | Permission | Admin | Contributor | Member | Viewer |
-        - Access decisions: | No. | Policy | Decision |
-        - VM specifications: | Component | Specification |
-        - NSG rules: | Name | Priority | Source | Source Ports | Destination | Destination Ports | Protocol | Access |
+        1. DEFAULT TO BULLET POINTS: You MUST default to using standard prose and bullet points for lists of features, considerations, or technology descriptions.
+        2. RESTRICTED TABLE USAGE: You are STRICTLY FORBIDDEN from generating a Markdown table unless the slide data is explicitly numeric, a strict matrix, or a migration schedule.
+        3. MANDATORY EXCEPTION — POLICY & SETTINGS TABLES: When the source slide data contains a structured configuration table with columns matching ANY of these patterns:
+            - "Policy Setting | Recommendation | Description"
+            - "Setting | Parameter | Description"
+            - "Policy Setting | Parameter | Description / Reason"
+            - "Setting | Parameter / Recommendation | Description / Remarks"
+            - Any combination of these three columns (Setting/Policy + Value/Recommendation + Description/Remarks)
+            You MUST reproduce the ENTIRE table with ALL rows preserved. This is a MANDATORY EXCEPTION to the bullet-point default rule. These are technical configuration deliverables and must NOT be summarized into prose or bullet points.
+        4. PANDOC FORMATTING (CRITICAL): You MUST leave a completely blank empty line immediately BEFORE and AFTER every single Markdown table so the document parser renders it correctly as a grid.
+        5. TABLE SYNTAX (CRITICAL): You MUST include leading and trailing pipes (`|`) on EVERY row of the table. Example: `| Col A | Col B |`. DO NOT omit the outer edge pipes, or the parser will fail to render the grid!
+        6. NO LINE BREAKS IN CELLS (CRITICAL): You are STRICTLY FORBIDDEN from using line breaks (\n) or paragraph returns inside a table cell. All text within a single cell MUST be written as one continuous line of text, no matter how long it is.
+        7. If you do encounter strict data that requires a table, you must use these columns:
+            - Design Decisions: | No. | Design Decision | Decision |
+            - Task/Migration Rollout: | Item | Activities | Action By | Status |
+            - Workspace/Admin capabilities: | Permission | Admin | Contributor | Member | Viewer |
+            - Access decisions: | No. | Policy | Decision |
+            - VM specifications: | Component | Specification |
+            - NSG rules: | Name | Priority | Source | Source Ports | Destination | Destination Ports | Protocol | Access |
+
+
+        -- FAITHFUL TRANSCRIPTION RULE FOR POLICY/SETTINGS TABLES (CRITICAL) --
+        1. COPY-PASTE FIDELITY: For policy/settings configuration tables (as defined in the Mandatory Exception above), you MUST reproduce the table contents EXACTLY as written in the source slides. Do NOT paraphrase, summarize, rewrite, or "improve" the wording.
+        2. PRESERVE EVERY ROW: Every row from the source table MUST appear in the output. Do NOT collapse multiple rows into a summary line. If the source has 30 rows, your output MUST have 30 rows.
+        3. PRESERVE ALL VALUES VERBATIM:
+        - Setting names → copy exactly (e.g., "Bulk email spam action", not "Bulk Email Action")
+        - Recommendation values → copy exactly (e.g., "On", "Off", "7 Days", "1 hour expired, notify user 10 mins before signed them out")
+        - Description text → copy word-for-word from the source slide
+        4. PRESERVE STRUCTURE: If the source slide uses category headers within the table (e.g., "External sharing", "File and folder links", "Unmanaged Device"), preserve these as sub-headings or first-column markers in the output.
+        5. NO PARAPHRASING ALLOWED: You are FORBIDDEN from rewording descriptions to "make them sound more professional." The source wording IS the standard.
+        6. NO CREATIVE ADDITIONS: Do NOT add your own settings, parameters, or descriptions that are not in the source slides.
+        7. MULTI-PART TABLES: If the source contains "Part 1/4", "Part 2/4", "Part 3/4", "Part 4/4" of the same table, reproduce ALL parts as separate tables under separate sub-headings (e.g., "### SharePoint Online Settings (Part 1 of 4)", "### SharePoint Online Settings (Part 2 of 4)").
+
+        NOTE: This rule applies ONLY to policy/settings configuration tables. For all other content (Risk descriptions, Assessment narratives, Technology Overview, Design Decisions, Migration timelines), continue using your default consulting-writing style.
+
 
         -- STRICT IMAGE RULES --
         - Select only architecture diagrams, data flow diagrams, network topologies, or access/security diagrams.
@@ -1004,7 +1029,8 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
                     {"role": "system", "content": writer_system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                "temperature": 0.4
+                "temperature": 0.4,
+                "max_tokens": 16384
             }
             try:
                 response = requests.post(url, headers=headers, json=payload, timeout=240)
