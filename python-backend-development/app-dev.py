@@ -800,7 +800,7 @@ def generate_table_of_contents(task_id: str, extraction_payload: Dict[str, Any])
         "   - Next: Platform Design & Decisions (Include Sub-sections for Workflows, Resource Organization, or Data Governance ONLY if present)\n"
         "       SPECIAL HANDLING FOR MULTI-PART SETTINGS TABLES: If the slides contain multiple parts of the same settings table (e.g., 'Settings Part 1/4', 'Settings Part 2/4', 'Settings Part 3/4', 'Settings Part 4/4', or 'Meetings Settings 1/7' through 'Meetings Settings 7/7'), you MUST create a SEPARATE sub-section for EACH part. Do NOT combine multiple parts into one mega-section. For example, if there are 7 parts of Meetings Settings, create 7 sub-sections (e.g., '6.X.1 Meetings Settings (Part 1 of 7)', '6.X.2 Meetings Settings (Part 2 of 7)', etc.). In the generation_instructions for each sub-section, explicitly state: 'Reproduce the policy/settings table from this slide EXACTLY as written. Do not paraphrase or summarize. Apply the FAITHFUL TRANSCRIPTION RULE.'\n"
         "   - Next: Deployment & Migration Approach (Include ONLY if the slides contain migration timelines, phases, or strategies)\n"
-        "   - X.0 Appendix (This MUST be the final section. Number it sequentially based on the last section generated. Instruct the Writer to include Limits, Boundaries, and Reference Links here).\n"
+        "   - DO NOT INCLUDE AN APPENDIX SECTION. The Appendix will be generated separately by a dedicated agent after the main content is complete. Stop the TOC at the last main content section (Deployment & Migration Approach or whichever is last).\n"
         "4. Output the outline strictly as a JSON object matching this schema:\n"
         "{\n"
         ' "client_name": "string (Exact client name from title slide)",\n'
@@ -938,18 +938,6 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
         1. Each table must appear EXACTLY ONCE across the full document. If a table was in a main section, the Appendix must NOT repeat it.
         2. NSG rules belong ONLY in the Security Design section. VM specifications belong ONLY in the Platform Design section.
         3. NO INTERNAL APPENDIX POINTERS: Do not write any sentences that direct the reader to the appendix, such as "Note: Please refer to the appendix..." 
-
-        ================================================================================
-        -- APPENDIX FORMATTING (STRICT RULES) --
-        If the instructions indicate you are writing the Appendix section:
-        1. DYNAMIC NUMBERING: Its numbering MUST logically follow the preceding main section. Do NOT hardcode "9.0".
-        2. It MUST have exactly these three H3 sub-sections: `### Introduction/Prerequisites`, `### Limits and Boundaries`, `### Others`.
-        3. ZERO EXPLANATION RULE: Do NOT write any introductory sentences, concluding remarks, or explanations. Output ONLY the headers and the links.
-        4. CRITICAL LINK FORMATTING:
-        - You MUST leave a blank empty line between every single link so they do not merge together into one paragraph.
-        - Do NOT use bullet points (`*` or `-`).
-        - Use this EXACT Markdown format: Title of the Reference: [https://...](https://...)
-        ================================================================================
     """
     
     use_agent = False
@@ -1059,6 +1047,125 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
 
     return final_document_markdown
 
+# -----------------------------
+# Appendix Agent (Dedicated)
+# -----------------------------
+def generate_appendix_from_markdown(task_id: str, document_markdown: str, 
+                                     last_section_number: int) -> str:
+    """Generate the Appendix by analyzing the completed document markdown.
+    
+    This runs as a separate agent AFTER the main content is written.
+    It reads the full document body, identifies the topics discussed,
+    and generates a relevant Appendix with Microsoft Learn references.
+    
+    Args:
+        task_id: Task ID for cost tracking
+        document_markdown: The full document markdown (Sections 2.0 - X.0)
+        last_section_number: The last section number from the TOC (e.g., 9)
+    
+    Returns:
+        Appendix markdown (just the Appendix part, ready to append)
+        Returns empty string if generation fails (safe fallback).
+    """
+    if not AGENT_OPENAI_ENDPOINT or not AGENT_OPENAI_KEY:
+        return ""
+
+    base_endpoint = AGENT_OPENAI_ENDPOINT.split("/openai")[0].rstrip("/")
+    url = f"{base_endpoint}/openai/v1/chat/completions"
+    headers = {
+        "api-key": AGENT_OPENAI_KEY,
+        "Authorization": f"Bearer {AGENT_OPENAI_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    appendix_number = last_section_number + 1
+    
+    appendix_system_prompt = f"""You are a Microsoft documentation specialist. Your only job is to write the Appendix section for a Solution Design Document.
+
+        You will receive the FULL TEXT of the document body. Read it carefully to identify the specific Microsoft technologies, settings, and topics discussed.
+
+        Then produce ONLY the Appendix section in Markdown format using this EXACT structure:
+
+        # {appendix_number}.0 Appendix
+
+        ## [Topic Area Name]
+
+        Title of Reference: [https://learn.microsoft.com/specific-page](https://learn.microsoft.com/specific-page)
+
+        Title of Reference: [https://learn.microsoft.com/specific-page](https://learn.microsoft.com/specific-page)
+
+        ## [Another Topic Area Name]
+
+        Title of Reference: [https://learn.microsoft.com/specific-page](https://learn.microsoft.com/specific-page)
+
+        RULES:
+        1. Generate 2 to 5 H2 sub-sections (use ## heading level). Choose names that describe the actual content areas discussed (examples: "SharePoint Online & OneDrive Configuration", "Microsoft Teams Policies", "Exchange Online Hybrid Mail Flow", "Microsoft Fabric Workspace Management").
+
+        2. Do NOT use generic names like "Introduction/Prerequisites", "Limits and Boundaries", or "Others".
+
+        3. All URLs must be from learn.microsoft.com — no other sources, no third-party blogs, no GitHub.
+
+        4. URLs should point to specific Microsoft Learn pages, not homepages. For example, prefer "learn.microsoft.com/en-us/sharepoint/external-sharing-overview" over "learn.microsoft.com/en-us/sharepoint/".
+
+        5. Each reference should relate to a specific topic discussed in the document.
+
+        6. Leave a blank line between each reference link.
+
+        7. No bullet points, no introductions, no conclusions. Just the headers and references.
+
+        8. Output ONLY the Appendix markdown. Do not wrap in code blocks. Do not add any other text before or after.
+
+        9. CRITICAL LINK FORMAT: Each URL MUST be wrapped in Markdown link syntax `[url](url)` so it renders as a proper clickable hyperlink in Word (blue color, underlined). Do NOT output raw URLs as plain text.
+            - WRONG: `Title: https://learn.microsoft.com/page`
+            - RIGHT: `Title: [https://learn.microsoft.com/page](https://learn.microsoft.com/page)`
+    """
+
+    user_prompt = f"""Here is the document body. Read it and generate the Appendix:
+
+        ---DOCUMENT BODY START---
+        {document_markdown}
+        ---DOCUMENT BODY END---
+
+        Now generate the Appendix section following the rules in the system prompt.
+    """
+
+    payload = {
+        "model": WRITER_DEPLOYMENT,
+        "messages": [
+            {"role": "system", "content": appendix_system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "temperature": 0.3,
+        "max_tokens": 4096
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=180)
+        if response.status_code == 200:
+            data = response.json()
+            appendix_text = data["choices"][0]["message"]["content"].strip()
+            
+            # Strip code fences if present
+            if appendix_text.startswith("```"):
+                appendix_text = appendix_text.split("\n", 1)[-1]
+            if appendix_text.endswith("```"):
+                appendix_text = appendix_text.rsplit("\n", 1)[0]
+            
+            # Track tokens for cost
+            usage = data.get("usage", {})
+            task = get_task(task_id)
+            if task and "cost_metrics" in task:
+                task["cost_metrics"]["llm_tokens_prompt"] += usage.get("prompt_tokens", 0)
+                task["cost_metrics"]["llm_tokens_completion"] += usage.get("completion_tokens", 0)
+            
+            print(f"[Appendix Agent] Successfully generated Appendix ({len(appendix_text)} chars)")
+            return appendix_text.strip()
+        else:
+            print(f"[Appendix Agent] Failed with HTTP status {response.status_code}")
+            return ""
+    except Exception as e:
+        print(f"[Appendix Agent] Error: {e}")
+        return ""
 
 # =============================================================================
 # Markdown -> DOCX (Pandoc + python-docx post-processing)
@@ -2049,12 +2156,47 @@ def background_processing(task_id: str):
             "progress": 85
         })
 
+        # final_doc_md = write_document_sections(task_id, toc, merged)
+        # final_doc_md = final_doc_md.replace(str(task_dir) + os.sep, "")
+
+        # md_file = task_dir / "FINAL_DESIGN_DOCUMENT.md"
+        # with open(md_file, "w", encoding="utf-8") as f:
+        #     f.write(final_doc_md)
+
+        # =============================================================================
         final_doc_md = write_document_sections(task_id, toc, merged)
         final_doc_md = final_doc_md.replace(str(task_dir) + os.sep, "")
+
+        # Step: Generate Appendix from the completed document (dedicated agent)
+        update_task(task_id, {
+            "step_name": "Generating Appendix References",
+            "progress": 92
+        })
+
+        # Determine the last section number from the TOC
+        last_section = 1
+        for section in toc.get("sections", []):
+            sec_num_str = section.get("section_number", "0.0")
+            try:
+                main_num = int(sec_num_str.split(".")[0])
+                if main_num > last_section:
+                    last_section = main_num
+            except (ValueError, AttributeError):
+                pass
+
+        print(f"[background_processing] Generating Appendix as section {last_section + 1}.0")
+        appendix_md = generate_appendix_from_markdown(task_id, final_doc_md, last_section)
+
+        if appendix_md:
+            final_doc_md += f"\n\n{appendix_md}\n\n"
+            print(f"[background_processing] Appendix appended successfully")
+        else:
+            print("[background_processing] Appendix generation skipped or failed; continuing without Appendix.")
 
         md_file = task_dir / "FINAL_DESIGN_DOCUMENT.md"
         with open(md_file, "w", encoding="utf-8") as f:
             f.write(final_doc_md)
+        # =============================================================================
 
         update_task(task_id, {
             "step_name": "Converting to Word Document",
