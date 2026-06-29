@@ -1,8 +1,11 @@
-python-backend-development/.env
-python-backend-development/outputs
-python-backend-development/__pycache__
+python-backend-dev/.env
 
-python-backend-deployment/__pycache__
+python-backend-dev/outputs
+python-backend-prod/outputs
+python-backend-test/outputs
+
+python-backend-dev/__pycache__
+python-backend-prod/__pycache__
 
 extraction-output
 sample-documents
@@ -11,5 +14,11 @@ sample-images
 sample-testing-document
 
 slides-to-doc-fastapi.txt
+
+deployment-command.txt
+lovable-ui-prompt.txt
+
+.venv
+
 
 

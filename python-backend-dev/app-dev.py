@@ -711,6 +711,7 @@ def analyze_images_with_vision(task_id: str, slides_data: List[Dict[str, Any]]) 
                     if task and "cost_metrics" in task:
                         task["cost_metrics"]["vision_tokens_prompt"] += usage.get("prompt_tokens", 0)
                         task["cost_metrics"]["vision_tokens_completion"] += usage.get("completion_tokens", 0)
+                        update_task(task_id, {"cost_metrics": task["cost_metrics"]})  # ← ADDED THIS LINE
                         
             except Exception:
                 # preserve original behavior (silent on error)
@@ -840,6 +841,7 @@ def generate_table_of_contents(task_id: str, extraction_payload: Dict[str, Any])
             if task and "cost_metrics" in task:
                 task["cost_metrics"]["llm_tokens_prompt"] += usage.get("prompt_tokens", 0)
                 task["cost_metrics"]["llm_tokens_completion"] += usage.get("completion_tokens", 0)
+                update_task(task_id, {"cost_metrics": task["cost_metrics"]})  # ← ADDED THIS LINE
                 
             return json.loads(content)
         return None
@@ -1007,6 +1009,20 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
                     }
                 )
                 drafted_text = response.output_text
+                
+                # Capture Foundry agent token usage
+                try:
+                    usage = response.usage
+                    task = get_task(task_id)
+                    if task and "cost_metrics" in task:
+                        # Foundry responses API uses input_tokens / output_tokens
+                        prompt_tokens = getattr(usage, 'input_tokens', 0) or getattr(usage, 'prompt_tokens', 0)
+                        completion_tokens = getattr(usage, 'output_tokens', 0) or getattr(usage, 'completion_tokens', 0)
+                        task["cost_metrics"]["llm_tokens_prompt"] += prompt_tokens
+                        task["cost_metrics"]["llm_tokens_completion"] += completion_tokens
+                        update_task(task_id, {"cost_metrics": task["cost_metrics"]})
+                except Exception:
+                    pass  # Don't fail the section if usage extraction fails
             except Exception:
                 pass
 
@@ -1032,6 +1048,7 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
                     if task and "cost_metrics" in task:
                         task["cost_metrics"]["llm_tokens_prompt"] += usage.get("prompt_tokens", 0)
                         task["cost_metrics"]["llm_tokens_completion"] += usage.get("completion_tokens", 0)
+                        update_task(task_id, {"cost_metrics": task["cost_metrics"]})  # ← ADDED THIS LINE
             except Exception:
                 pass
 
@@ -1157,6 +1174,7 @@ def generate_appendix_from_markdown(task_id: str, document_markdown: str,
             if task and "cost_metrics" in task:
                 task["cost_metrics"]["llm_tokens_prompt"] += usage.get("prompt_tokens", 0)
                 task["cost_metrics"]["llm_tokens_completion"] += usage.get("completion_tokens", 0)
+                update_task(task_id, {"cost_metrics": task["cost_metrics"]})  # ← ADDED THIS LINE
             
             print(f"[Appendix Agent] Successfully generated Appendix ({len(appendix_text)} chars)")
             return appendix_text.strip()
@@ -1718,6 +1736,10 @@ def _fix_tables(doc):
             # Apply the exact explicit width to every single cell
             for row in table.rows:
                 for idx, cell in enumerate(row.cells):
+                    # Safety: skip cells beyond expected column count
+                    if idx >= len(col_widths):
+                        continue
+                    
                     tcPr = cell._tc.get_or_add_tcPr()
                     
                     existing_tcW = tcPr.find(qn('w:tcW'))
