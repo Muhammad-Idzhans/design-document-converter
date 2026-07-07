@@ -31,7 +31,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 try:
     from openai import AzureOpenAI  # noqa: F401
 except ImportError:
-    pass
+    print("[ImportWarning] AzureOpenAI package not installed, some features may be unavailable.")
 
 load_dotenv()
 
@@ -263,7 +263,8 @@ def load_tasks() -> Dict[str, Any]:
             try:
                 with open(TASKS_FILE, "r", encoding="utf-8") as f:
                     return json.load(f)
-            except Exception:
+            except Exception as e:
+                print(f"[load_tasks] Failed to parse tasks_db.json: {e}")
                 return {}
         return {}
 
@@ -407,13 +408,13 @@ def generate_slide_thumbnails(pptx_path: str, output_dir: Path) -> None:
         try:
             if doc is not None:
                 doc.close()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[generate_slide_thumbnails] Failed to close PDF document: {e}")
         try:
             if os.path.exists(temp_pdf):
                 os.remove(temp_pdf)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[generate_slide_thumbnails] Failed to remove temp PDF: {e}")
 
 
 def extract_preview(pptx_path: str, task_id: str) -> Dict[str, Any]:
@@ -468,10 +469,24 @@ def extract_shapes(shapes, slide_info: Dict[str, Any], ctx: Dict[str, Any]) -> N
                 if text and text != slide_info.get("title"):
                     slide_info["text_content"].append(text)
 
+        # if shape.shape_type == 13:
+        #     ctx["image_counter"] += 1
+        #     img = shape.image
+        #     ext = img.content_type.split("/")[-1]
+
         if shape.shape_type == 13:
+            # Safely try to access shape.image — some PPTX files have linked
+            # or broken image references that raise AttributeError.
+            try:
+                img = shape.image
+            except (AttributeError, KeyError, ValueError) as e:
+                print(f"[extract_shapes] Skipping broken/linked image on slide {ctx['slide_idx']}: {e}")
+                continue
+            
             ctx["image_counter"] += 1
-            img = shape.image
             ext = img.content_type.split("/")[-1]
+
+
             if ext in ["x-wmf", "wmf", "x-emf", "emf"]:
                 ext = "png"
 
@@ -486,7 +501,8 @@ def extract_shapes(shapes, slide_info: Dict[str, Any], ctx: Dict[str, Any]) -> N
                     wmf_img.save(filepath, format="PNG")
                     content_type = "image/png"
                     size_bytes = os.path.getsize(filepath)
-                except Exception:
+                except Exception as e:
+                    print(f"[extract_shapes] WMF/EMF to PNG conversion failed, saving raw: {e}")
                     filename = f"slide_{ctx['slide_idx']:03d}_img_{ctx['image_counter']:03d}.x-wmf"
                     filepath = ctx["images_dir"] / filename
                     with open(filepath, "wb") as f:
@@ -713,9 +729,8 @@ def analyze_images_with_vision(task_id: str, slides_data: List[Dict[str, Any]]) 
                         task["cost_metrics"]["vision_tokens_completion"] += usage.get("completion_tokens", 0)
                         update_task(task_id, {"cost_metrics": task["cost_metrics"]})  # ← ADDED THIS LINE
                         
-            except Exception:
-                # preserve original behavior (silent on error)
-                pass
+            except Exception as e:
+                print(f"[analyze_images_with_vision] Vision API call failed for {img.get('filename', 'unknown')}: {e}")
 
     return slides_data
 
@@ -845,7 +860,8 @@ def generate_table_of_contents(task_id: str, extraction_payload: Dict[str, Any])
                 
             return json.loads(content)
         return None
-    except Exception:
+    except Exception as e:
+        print(f"[generate_table_of_contents] Failed to parse TOC response: {e}")
         return None
 
 
@@ -930,11 +946,43 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
         NOTE: This rule applies ONLY to policy/settings configuration tables. For all other content (Risk descriptions, Assessment narratives, Technology Overview, Design Decisions, Migration timelines), continue using your default consulting-writing style.
 
 
-        -- STRICT IMAGE RULES --
-        - Select only architecture diagrams, data flow diagrams, network topologies, or access/security diagrams.
-        - Each UNIQUE image file_path may only be embedded ONCE across the entire document.
-        - Syntax: `![](file_path)` — use the exact path from the JSON. Do NOT invent paths.
-        - CAPTION RULE: You MUST place a blank empty line between the image and its caption to separate them! (e.g., Figure 1: High-level architecture). Keep the caption brief.
+        -- STRICT IMAGE RULES (CRITICAL — NEW SYNTAX) --
+        You will be given a list of AVAILABLE IMAGES for this section in the user prompt.
+        The system has ALREADY filtered these images to prevent duplication — trust the list completely.
+
+        CASE A — AVAILABLE IMAGES LIST HAS ENTRIES:
+        - You MAY insert relevant diagrams using this EXACT placeholder syntax:
+            <<IMAGE:filename>>
+          Example: <<IMAGE:slide_020_img_003.png>>
+        - DO NOT use Markdown image syntax like `path`. The code will handle the actual image embedding.
+        - DO NOT invent filenames. Only use filenames EXACTLY from the AVAILABLE IMAGES list.
+        - Select only diagrams that add value: architecture diagrams, data flow diagrams, 
+          network topologies, or access/security diagrams. Skip decorative or redundant images.
+        - CAPTION RULE: After the placeholder, leave a blank empty line, then write a brief 
+          caption sentence starting with "Figure:".
+          Example structure:
+            The diagram below illustrates the data flow from source to destination.
+            
+            <<IMAGE:slide_020_img_003.png>>
+            
+            Figure: High-level architecture of the data pipeline.
+
+        CASE B — AVAILABLE IMAGES LIST IS "None" OR EMPTY (CRITICAL):
+        You are STRICTLY FORBIDDEN from doing ANY of the following:
+        - Writing "The diagram below...", "The following diagram...", "As shown in the diagram..."
+        - Writing "The architecture diagram illustrates...", "The figure demonstrates..."
+        - Writing any sentence that references a visual, diagram, figure, illustration, or chart
+        - Writing any "Figure:" caption
+        - Inserting any <<IMAGE:>> placeholder
+        - Referencing visual elements from the slide data (even if the slides mention them)
+        
+        Instead, explain the concept in pure prose. If the slide data mentions "a diagram shows X",
+        you MUST rewrite it as "X works as follows..." or "The architecture consists of..." 
+        WITHOUT any visual reference.
+
+        REMEMBER: The AVAILABLE IMAGES list is authoritative. If it says None, there is NO image
+        for this section — do not fabricate visual references.
+
 
         -- NO-REPETITION RULES --
         1. Each table must appear EXACTLY ONCE across the full document. If a table was in a main section, the Appendix must NOT repeat it.
@@ -965,6 +1013,32 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
             print(f"Failed to intialize Azure AI Projects Client: {e}")
             use_agent = False
 
+    # for section in toc.get("sections", []):
+    #     sec_num = section.get("section_number")
+    #     sec_title = section.get("section_title")
+    #     instructions = section.get("generation_instructions")
+    #     mapped_slides = section.get("mapped_slides", [])
+
+    #     relevant_slide_data = [
+    #         s for s in extraction_payload.get("slides", [])
+    #         if s.get("slide_number") in mapped_slides
+    #     ]
+
+    #     # Build list of AVAILABLE IMAGES for this section (only non-decorative)
+    #     available_images = []
+    #     for slide in relevant_slide_data:
+    #         for img in slide.get("images", []):
+    #             desc = img.get("ai_description", "")
+    #             if desc and desc.strip().upper() != "DECORATIVE":
+    #                 available_images.append({
+    #                     "filename": img.get("filename"),
+    #                     "description": desc[:200]  # Truncate long descriptions
+    #                 })
+
+    # Track which images have already been offered to earlier sections
+    # This prevents the same image from being offered to multiple sections
+    globally_offered_images = set()
+
     for section in toc.get("sections", []):
         sec_num = section.get("section_number")
         sec_title = section.get("section_title")
@@ -976,6 +1050,39 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
             if s.get("slide_number") in mapped_slides
         ]
 
+        # Build list of AVAILABLE IMAGES for this section (only non-decorative)
+        # AND only images that haven't already been offered to earlier sections
+        available_images = []
+        for slide in relevant_slide_data:
+            for img in slide.get("images", []):
+                filename = img.get("filename")
+                desc = img.get("ai_description", "")
+                
+                # Skip if decorative
+                if not desc or desc.strip().upper() == "DECORATIVE":
+                    continue
+                
+                # Skip if this image was already offered to an earlier section
+                if filename in globally_offered_images:
+                    continue
+                
+                # Offer this image to the current section and mark as used
+                available_images.append({
+                    "filename": filename,
+                    "description": desc[:200]  # Truncate long descriptions
+                })
+                globally_offered_images.add(filename)
+
+        # Format available images as a readable list for the AI
+        if available_images:
+            images_list_str = "\n".join([
+                f"- {img['filename']} (Description: {img['description']})"
+                for img in available_images
+            ])
+            images_section = f"\nAVAILABLE IMAGES FOR THIS SECTION:\n{images_list_str}\n\nIf relevant, use the placeholder syntax <<IMAGE:filename>> to insert these images.\n"
+        else:
+            images_section = "\nAVAILABLE IMAGES FOR THIS SECTION: None\n"
+
         client_name = toc.get("client_name", "")
         client_name_full = toc.get("client_name_full", "")
 
@@ -986,7 +1093,8 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
         user_prompt = (
             f"Write section '{sec_num} {sec_title}' for the design document.\n"
             f"{context_str}\n"
-            f"Instructions from Orchestrator: {instructions}\n\n"
+            f"Instructions from Orchestrator: {instructions}\n"
+            f"{images_section}\n"
             f"Here is the raw slide data (text, speaker notes, and diagram descriptions):\n"
             f"{json.dumps(relevant_slide_data, default=str)}"
         )
@@ -1021,10 +1129,10 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
                         task["cost_metrics"]["llm_tokens_prompt"] += prompt_tokens
                         task["cost_metrics"]["llm_tokens_completion"] += completion_tokens
                         update_task(task_id, {"cost_metrics": task["cost_metrics"]})
-                except Exception:
-                    pass  # Don't fail the section if usage extraction fails
-            except Exception:
-                pass
+                except Exception as e:
+                    print(f"[write_document_sections] Agent usage token extraction failed for '{sec_title}': {e}")
+            except Exception as e:
+                print(f"[write_document_sections] Agent section drafting failed for '{sec_title}': {e}")
 
         if not use_agent or not drafted_text:
             payload = {
@@ -1049,8 +1157,8 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
                         task["cost_metrics"]["llm_tokens_prompt"] += usage.get("prompt_tokens", 0)
                         task["cost_metrics"]["llm_tokens_completion"] += usage.get("completion_tokens", 0)
                         update_task(task_id, {"cost_metrics": task["cost_metrics"]})  # ← ADDED THIS LINE
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[write_document_sections] Fallback LLM call failed for '{sec_title}': {e}")
 
         if drafted_text:
             if drafted_text.startswith("```"):
@@ -1185,6 +1293,79 @@ def generate_appendix_from_markdown(task_id: str, document_markdown: str,
         print(f"[Appendix Agent] Error: {e}")
         return ""
 
+
+
+# -----------------------------
+# Image Placeholder Post-Processing (Hybrid B Strategy)
+# -----------------------------
+def replace_image_placeholders(markdown_text: str, 
+                                extraction_payload: Dict[str, Any]) -> str:
+    """Convert AI-generated <<IMAGE:filename>> placeholders to real Pandoc-compatible markdown.
+    
+    This is the Hybrid B strategy:
+    - AI decides WHICH images to use and WHERE to place them
+    - This function does the actual markdown injection with proper paths
+    
+    Rules:
+    - Only embeds images that exist in extraction_payload
+    - Each image embedded only ONCE across entire document (deduplication)
+    - Unknown placeholders are silently removed
+    
+    Args:
+        markdown_text: Raw markdown from writer agent (may contain <<IMAGE:xxx>>)
+        extraction_payload: The merged extraction data with image info
+    
+    Returns:
+        Markdown with placeholders replaced by `images/filename` references
+    """
+    print(f"\n[ImageInject] ===== STARTING IMAGE PLACEHOLDER REPLACEMENT =====")
+    
+    # Step 1: Build a set of valid filenames from extraction
+    valid_filenames = set()
+    for slide in extraction_payload.get("slides", []):
+        for img in slide.get("images", []):
+            filename = img.get("filename", "")
+            if filename:
+                valid_filenames.add(filename)
+    
+    print(f"[ImageInject] Total valid image filenames: {len(valid_filenames)}")
+    
+    # Step 2: Track which images have already been used (deduplication)
+    used_filenames = set()
+    
+    # Step 3: Find and replace all placeholders
+    # Pattern matches: <<IMAGE:filename.ext>>
+    placeholder_pattern = re.compile(r'<<IMAGE:([^>]+)>>')
+    
+    def replace_placeholder(match):
+        filename = match.group(1).strip()
+        
+        # Case A: Unknown filename → remove
+        if filename not in valid_filenames:
+            print(f"[ImageInject]   ⚠️  Unknown filename, removing: {filename}")
+            return ""
+        
+        # Case B: Already used → remove (no duplicates)
+        if filename in used_filenames:
+            print(f"[ImageInject]   ⚠️  Duplicate image, removing: {filename}")
+            return ""
+        
+        # Case C: Valid and unused → inject proper markdown
+        used_filenames.add(filename)
+        proper_path = f"images/{filename}"
+        print(f"[ImageInject]   ✅ Injecting: {filename}")
+        return f"![]({proper_path})"
+    
+    fixed_markdown = placeholder_pattern.sub(replace_placeholder, markdown_text)
+    
+    # Step 4: Final stats
+    print(f"[ImageInject] Total images injected: {len(used_filenames)}")
+    print(f"[ImageInject] ====================================\n")
+    
+    return fixed_markdown
+
+
+
 # =============================================================================
 # Markdown -> DOCX (Pandoc + python-docx post-processing)
 # =============================================================================
@@ -1261,8 +1442,8 @@ def _build_title_page(doc, first_p, project_title, document_title, client_name, 
         run = p_logo.add_run()
         try:
             run.add_picture(str(client_logo_path), height=Inches(1.5))
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[build_docx] Failed to insert client logo on title page: {e}")
 
     # Spacing
     for _ in range(4):
@@ -1303,8 +1484,8 @@ def _build_title_page(doc, first_p, project_title, document_title, client_name, 
         run = p_enfrasys.add_run()
         try:
             run.add_picture(str(enfrasys_logo), width=Inches(1.5))
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[build_docx] Failed to insert Enfrasys logo on title page: {e}")
 
     # Page break after title page
     p_break_title = first_p.insert_paragraph_before("")
@@ -1347,8 +1528,8 @@ def _apply_header_footer(doc, document_title, client_logo_path):
         p_left.alignment = WD_ALIGN_PARAGRAPH.LEFT
         try:
             p_left.add_run().add_picture(str(client_logo_path), height=Inches(0.6))
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[build_docx] Failed to insert client logo in header: {e}")
 
     cell_right.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
     if os.path.exists(enfrasys_logo):
@@ -1356,8 +1537,8 @@ def _apply_header_footer(doc, document_title, client_logo_path):
         p_right.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         try:
             p_right.add_run().add_picture(str(enfrasys_logo), width=Inches(1.5))
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[build_docx] Failed to insert Enfrasys logo in header: {e}")
 
     # --- Footer ---
     clean_title = document_title.replace('\n', '').replace('\r', '').strip()
@@ -1418,7 +1599,7 @@ def _build_front_matter_and_toc(doc, first_p, client_name, project_title):
     add_p_before("Change Record", bold=True, size=14)
     table1 = doc.add_table(rows=3, cols=4)
     try: table1.style = 'Table Grid'
-    except KeyError: pass
+    except KeyError as e: print(f"[build_docx] 'Table Grid' style not found for Change Record table: {e}")
     hdr_cells = table1.rows[0].cells
     hdr_cells[0].text = 'Date'
     hdr_cells[1].text = 'Author'
@@ -1435,7 +1616,7 @@ def _build_front_matter_and_toc(doc, first_p, client_name, project_title):
     add_p_before("Distribution List", bold=True, size=14)
     table2 = doc.add_table(rows=3, cols=2)
     try: table2.style = 'Table Grid'
-    except KeyError: pass
+    except KeyError as e: print(f"[build_docx] 'Table Grid' style not found for Distribution List table: {e}")
     hdr_cells2 = table2.rows[0].cells
     hdr_cells2[0].text = 'Name'
     hdr_cells2[1].text = 'Position/ Team'
@@ -1497,7 +1678,7 @@ def _build_front_matter_and_toc(doc, first_p, client_name, project_title):
     # --- PAGE 4: SIGN OFF ---
     p_signoff = add_p_before("1.0 Design Document Sign Off", size=15)
     try: p_signoff.style = 'Heading 1'
-    except Exception: pass
+    except Exception as e: print(f"[build_docx] Failed to set Sign Off heading style: {e}")
 
     signoff_text_1 = f"We hereby acknowledge that the design document for {client_name} {project_title} has been reviewed, and all key aspects have been addressed satisfactorily."
     add_p_before(signoff_text_1, size=11, space_before=12)
@@ -1518,7 +1699,7 @@ def _build_front_matter_and_toc(doc, first_p, client_name, project_title):
     # Signature table 1
     table_sig_1 = doc.add_table(rows=1, cols=2)
     try: table_sig_1.style = 'Table Grid'
-    except Exception: pass
+    except Exception as e: print(f"[build_docx] 'Table Grid' style not found for signature table 1: {e}")
     set_table_borders(table_sig_1)
     s1_cells = table_sig_1.rows[0].cells
     p_s1_left = s1_cells[0].paragraphs[0]
@@ -1537,7 +1718,7 @@ def _build_front_matter_and_toc(doc, first_p, client_name, project_title):
     # Signature table 2
     table_sig_2 = doc.add_table(rows=4, cols=2)
     try: table_sig_2.style = 'Table Grid'
-    except Exception: pass
+    except Exception as e: print(f"[build_docx] 'Table Grid' style not found for signature table 2: {e}")
     set_table_borders(table_sig_2)
     r1_cells = table_sig_2.rows[0].cells
     r1_cells[0].merge(r1_cells[1])
@@ -1630,12 +1811,24 @@ def _fix_tables(doc):
         if existing_borders is not None:
             tblPr.remove(existing_borders)
 
+        # tblBorders = OxmlElement('w:tblBorders')
+        # border_color = "000000" if is_signature_table else ENFRASYS_BLUE
+        # for border_name in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
+        #     border = OxmlElement(f'w:{border_name}')
+        #     border.set(qn('w:val'), 'single')
+        #     border.set(qn('w:sz'), '4')
+        #     border.set(qn('w:space'), '0')
+        #     border.set(qn('w:color'), border_color)
+        #     tblBorders.append(border)
+        # tblPr.append(tblBorders)
+
         tblBorders = OxmlElement('w:tblBorders')
-        border_color = "000000" if is_signature_table else ENFRASYS_BLUE
+        # Use black borders for ALL tables for consistent visibility
+        border_color = "000000"
         for border_name in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
             border = OxmlElement(f'w:{border_name}')
             border.set(qn('w:val'), 'single')
-            border.set(qn('w:sz'), '4')
+            border.set(qn('w:sz'), '8')       # ← Increased from 4 to 8 (1pt visible)
             border.set(qn('w:space'), '0')
             border.set(qn('w:color'), border_color)
             tblBorders.append(border)
@@ -1890,8 +2083,9 @@ def _fix_typography_and_captions(doc):
             continue
 
         # --- A. FIX IMAGE CAPTIONS (Renumber & Center Safely) ---
-        if text.lower().startswith("figure ") and ":" in text:
-            new_text = re.sub(r'(?i)^figure\s+\d+\s*:', f'Figure {figure_counter}:', text)
+        if text.lower().startswith("figure") and ":" in text:
+            # Match either "Figure:" OR "Figure N:" — code controls the numbering
+            new_text = re.sub(r'(?i)^figure\s*\d*\s*:', f'Figure {figure_counter}:', text)
 
             # SAFE TEXT REPLACEMENT: Protect inline images from being deleted!
             has_drawing = any(getattr(run._element, "drawing_lst", None) for run in para.runs)
@@ -2189,6 +2383,9 @@ def background_processing(task_id: str):
         final_doc_md = write_document_sections(task_id, toc, merged)
         final_doc_md = final_doc_md.replace(str(task_dir) + os.sep, "")
 
+        # NEW: Replace <<IMAGE:filename>> placeholders with proper markdown
+        final_doc_md = replace_image_placeholders(final_doc_md, merged)
+
         # Step: Generate Appendix from the completed document (dedicated agent)
         update_task(task_id, {
             "step_name": "Generating Appendix References",
@@ -2203,8 +2400,8 @@ def background_processing(task_id: str):
                 main_num = int(sec_num_str.split(".")[0])
                 if main_num > last_section:
                     last_section = main_num
-            except (ValueError, AttributeError):
-                pass
+            except (ValueError, AttributeError) as e:
+                print(f"[background_processing] Failed to parse section number '{sec_num_str}': {e}")
 
         print(f"[background_processing] Generating Appendix as section {last_section + 1}.0")
         appendix_md = generate_appendix_from_markdown(task_id, final_doc_md, last_section)
@@ -2275,11 +2472,16 @@ def background_processing(task_id: str):
         })
 
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"[background_processing] FAILED for task {task_id}:")
+        print(error_trace)
         update_task(task_id, {
             "status": "failed",
             "step_name": "Failed",
             "progress": 0,
-            "error": str(e)
+            "error": str(e),
+            "error_trace": error_trace
         })
 
 
