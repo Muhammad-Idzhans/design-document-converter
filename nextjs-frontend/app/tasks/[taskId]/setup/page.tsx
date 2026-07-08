@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { Button, Modal, Spin, Input, Badge } from "antd";
 import { PlayCircleOutlined, AppstoreOutlined, EditOutlined } from "@ant-design/icons";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 
-export default function PreviewPage() {
+export default function SetupPage() {
   const router = useRouter();
+  const params = useParams();
+  const taskId = params.taskId as string;
   
-  const [taskId, setTaskId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<any>(null);
   const [isClient, setIsClient] = useState(false);
   
@@ -19,11 +20,9 @@ export default function PreviewPage() {
   useEffect(() => {
     setIsClient(true);
     // Load data from session storage passed by Phase 1 Upload
-    const storedTaskId = sessionStorage.getItem("documentTaskId");
     const storedPreview = sessionStorage.getItem("documentPreview");
 
-    if (storedTaskId && storedPreview) {
-      setTaskId(storedTaskId);
+    if (storedPreview) {
       try {
         setPreviewData(JSON.parse(storedPreview));
       } catch (e) {
@@ -58,7 +57,7 @@ export default function PreviewPage() {
       if (!res.ok) throw new Error("Failed to start processing");
       
       // Navigate to Step 3
-      router.push("/processing");
+      router.push(`/tasks/${taskId}/processing`);
     } catch (err) {
       alert("Failed to connect to backend to start processing.");
       console.error(err);

@@ -61,10 +61,11 @@ export default function Header() {
     const router = useRouter();
 
     // Simple logic to highlight the correct step in the progress indicator
+    // Supports both old flat routes and new /tasks/[taskId]/* routes
     let step = 1;
-    if (pathname === "/preview") step = 2;
-    else if (pathname === "/processing") step = 3;
-    else if (pathname === "/edit") step = 4;
+    if (pathname === "/preview" || pathname.endsWith("/setup")) step = 2;
+    else if (pathname === "/processing" || pathname.endsWith("/processing")) step = 3;
+    else if (pathname === "/edit" || pathname.endsWith("/review")) step = 4;
 
     const handleLogoClick = () => {
         // If the user is already on the home page, do nothing

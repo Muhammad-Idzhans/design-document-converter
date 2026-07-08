@@ -303,7 +303,7 @@ export default function UploadPage() {
                               // Data is ready, save to session and move to preview
                               sessionStorage.setItem("documentPreview", JSON.stringify(statusData.preview_data));
                               setIsUploading(false);
-                              router.push('/preview');
+                              router.push(`/tasks/${taskId}/setup`);
                             }
                             else if (statusData.status === "failed") {
                               clearInterval(pollInterval);

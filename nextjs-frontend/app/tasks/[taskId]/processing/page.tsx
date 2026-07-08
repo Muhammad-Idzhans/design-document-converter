@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { Steps, Button, Spin } from "antd";
 import { CheckCircleFilled, LoadingOutlined } from "@ant-design/icons";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 
 export default function ProcessingPage() {
   const router = useRouter();
-  const [taskId, setTaskId] = useState<string | null>(null);
+  const params = useParams();
+  const taskId = params.taskId as string;
 
   // UI Loading Steps
   const [currentStep, setCurrentStep] = useState(0);
@@ -23,15 +24,12 @@ export default function ProcessingPage() {
     "Finalizing Word Document Format"
   ];
 
-  // 1. On Mount: Get Task ID
+  // 1. On Mount: Validate Task ID
   useEffect(() => {
-    const storedTaskId = sessionStorage.getItem("documentTaskId");
-    if (!storedTaskId) {
+    if (!taskId) {
       router.push("/");
-    } else {
-      setTaskId(storedTaskId);
     }
-  }, [router]);
+  }, [taskId, router]);
 
   // 2. Fake UI Progression (since the backend script blocks synchronously right now)
   useEffect(() => {
@@ -140,7 +138,7 @@ export default function ProcessingPage() {
                 <Button
                   type="primary"
                   size="large"
-                  onClick={() => router.push("/edit")}
+                  onClick={() => router.push(`/tasks/${taskId}/review`)}
                   style={{
                     height: "50px",
                     padding: "0 40px",
