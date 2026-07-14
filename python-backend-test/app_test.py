@@ -469,6 +469,11 @@ def extract_shapes(shapes, slide_info: Dict[str, Any], ctx: Dict[str, Any]) -> N
                 if text and text != slide_info.get("title"):
                     slide_info["text_content"].append(text)
 
+        # if shape.shape_type == 13:
+        #     ctx["image_counter"] += 1
+        #     img = shape.image
+        #     ext = img.content_type.split("/")[-1]
+
         if shape.shape_type == 13:
             # Safely try to access shape.image — some PPTX files have linked
             # or broken image references that raise AttributeError.
@@ -1008,6 +1013,28 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
             print(f"Failed to intialize Azure AI Projects Client: {e}")
             use_agent = False
 
+    # for section in toc.get("sections", []):
+    #     sec_num = section.get("section_number")
+    #     sec_title = section.get("section_title")
+    #     instructions = section.get("generation_instructions")
+    #     mapped_slides = section.get("mapped_slides", [])
+
+    #     relevant_slide_data = [
+    #         s for s in extraction_payload.get("slides", [])
+    #         if s.get("slide_number") in mapped_slides
+    #     ]
+
+    #     # Build list of AVAILABLE IMAGES for this section (only non-decorative)
+    #     available_images = []
+    #     for slide in relevant_slide_data:
+    #         for img in slide.get("images", []):
+    #             desc = img.get("ai_description", "")
+    #             if desc and desc.strip().upper() != "DECORATIVE":
+    #                 available_images.append({
+    #                     "filename": img.get("filename"),
+    #                     "description": desc[:200]  # Truncate long descriptions
+    #                 })
+
     # Track which images have already been offered to earlier sections
     # This prevents the same image from being offered to multiple sections
     globally_offered_images = set()
@@ -1078,8 +1105,8 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
             try:
                 response = openai_client.responses.create(
                     input=[
-                        {"role": "system", "content": writer_system_prompt},
-                        {"role": "user", "content": user_prompt}
+                        {"type": "message", "role": "system", "content": writer_system_prompt},
+                        {"type": "message", "role": "user", "content": user_prompt}
                     ],
                     extra_body={
                         "agent_reference": {
@@ -1784,6 +1811,17 @@ def _fix_tables(doc):
         if existing_borders is not None:
             tblPr.remove(existing_borders)
 
+        # tblBorders = OxmlElement('w:tblBorders')
+        # border_color = "000000" if is_signature_table else ENFRASYS_BLUE
+        # for border_name in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
+        #     border = OxmlElement(f'w:{border_name}')
+        #     border.set(qn('w:val'), 'single')
+        #     border.set(qn('w:sz'), '4')
+        #     border.set(qn('w:space'), '0')
+        #     border.set(qn('w:color'), border_color)
+        #     tblBorders.append(border)
+        # tblPr.append(tblBorders)
+
         tblBorders = OxmlElement('w:tblBorders')
         # Use black borders for ALL tables for consistent visibility
         border_color = "000000"
@@ -2334,6 +2372,13 @@ def background_processing(task_id: str):
             "progress": 85
         })
 
+        # final_doc_md = write_document_sections(task_id, toc, merged)
+        # final_doc_md = final_doc_md.replace(str(task_dir) + os.sep, "")
+
+        # md_file = task_dir / "FINAL_DESIGN_DOCUMENT.md"
+        # with open(md_file, "w", encoding="utf-8") as f:
+        #     f.write(final_doc_md)
+
         # =============================================================================
         final_doc_md = write_document_sections(task_id, toc, merged)
         final_doc_md = final_doc_md.replace(str(task_dir) + os.sep, "")
@@ -2399,21 +2444,23 @@ def background_processing(task_id: str):
                 markdown_text = f.read()
 
         # Final Cost Calculation
+        # NOTE: The actual cost computation has been moved to the frontend (review page)
+        # so it can use user-configured pricing from settings.json.
+        # The backend now only tracks raw usage metrics (token counts + page counts).
         final_task = get_task(task_id)
         if final_task and "cost_metrics" in final_task:
             metrics = final_task["cost_metrics"]
             # Track content understanding pages based on slide count
             metrics["content_understanding_pages"] = len(merged.get("slides", []))
             
-            # Calculate USD values
-            cost_usd = 0.0
-            cost_usd += metrics["vision_tokens_prompt"] * RATE_VISION_PROMPT
-            cost_usd += metrics["vision_tokens_completion"] * RATE_VISION_COMPLETION
-            cost_usd += metrics["llm_tokens_prompt"] * RATE_LLM_PROMPT
-            cost_usd += metrics["llm_tokens_completion"] * RATE_LLM_COMPLETION
-            cost_usd += metrics["content_understanding_pages"] * RATE_CU_PER_PAGE
-            
-            metrics["total_cost_myr"] = round(cost_usd * USD_TO_MYR_RATE, 2)
+            # --- OLD HARDCODED COST CALCULATION (moved to frontend) ---
+            # cost_usd = 0.0
+            # cost_usd += metrics["vision_tokens_prompt"] * RATE_VISION_PROMPT
+            # cost_usd += metrics["vision_tokens_completion"] * RATE_VISION_COMPLETION
+            # cost_usd += metrics["llm_tokens_prompt"] * RATE_LLM_PROMPT
+            # cost_usd += metrics["llm_tokens_completion"] * RATE_LLM_COMPLETION
+            # cost_usd += metrics["content_understanding_pages"] * RATE_CU_PER_PAGE
+            # metrics["total_cost_myr"] = round(cost_usd * USD_TO_MYR_RATE, 2)
             
             update_task(task_id, {"cost_metrics": metrics})
 

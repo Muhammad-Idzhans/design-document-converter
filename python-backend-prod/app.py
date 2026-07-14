@@ -469,6 +469,11 @@ def extract_shapes(shapes, slide_info: Dict[str, Any], ctx: Dict[str, Any]) -> N
                 if text and text != slide_info.get("title"):
                     slide_info["text_content"].append(text)
 
+        # if shape.shape_type == 13:
+        #     ctx["image_counter"] += 1
+        #     img = shape.image
+        #     ext = img.content_type.split("/")[-1]
+
         if shape.shape_type == 13:
             # Safely try to access shape.image — some PPTX files have linked
             # or broken image references that raise AttributeError.
@@ -1078,8 +1083,8 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
             try:
                 response = openai_client.responses.create(
                     input=[
-                        {"role": "system", "content": writer_system_prompt},
-                        {"role": "user", "content": user_prompt}
+                        {"type": "message", "role": "system", "content": writer_system_prompt},
+                        {"type": "message", "role": "user", "content": user_prompt}
                     ],
                     extra_body={
                         "agent_reference": {
@@ -2334,7 +2339,6 @@ def background_processing(task_id: str):
             "progress": 85
         })
 
-        # =============================================================================
         final_doc_md = write_document_sections(task_id, toc, merged)
         final_doc_md = final_doc_md.replace(str(task_dir) + os.sep, "")
 
@@ -2370,7 +2374,6 @@ def background_processing(task_id: str):
         md_file = task_dir / "FINAL_DESIGN_DOCUMENT.md"
         with open(md_file, "w", encoding="utf-8") as f:
             f.write(final_doc_md)
-        # =============================================================================
 
         update_task(task_id, {
             "step_name": "Converting to Word Document",
@@ -2404,16 +2407,6 @@ def background_processing(task_id: str):
             metrics = final_task["cost_metrics"]
             # Track content understanding pages based on slide count
             metrics["content_understanding_pages"] = len(merged.get("slides", []))
-            
-            # Calculate USD values
-            cost_usd = 0.0
-            cost_usd += metrics["vision_tokens_prompt"] * RATE_VISION_PROMPT
-            cost_usd += metrics["vision_tokens_completion"] * RATE_VISION_COMPLETION
-            cost_usd += metrics["llm_tokens_prompt"] * RATE_LLM_PROMPT
-            cost_usd += metrics["llm_tokens_completion"] * RATE_LLM_COMPLETION
-            cost_usd += metrics["content_understanding_pages"] * RATE_CU_PER_PAGE
-            
-            metrics["total_cost_myr"] = round(cost_usd * USD_TO_MYR_RATE, 2)
             
             update_task(task_id, {"cost_metrics": metrics})
 

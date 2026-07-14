@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { Button, Input, Modal, Spin, FloatButton, Typography } from "antd";
 import {
   FileWordOutlined,
@@ -24,6 +24,7 @@ export default function ReviewPage() {
 
   const [docName, setDocName] = useState("Generated_Design_Document");
   const [costMetrics, setCostMetrics] = useState<any>(null);
+  const [pricingSettings, setPricingSettings] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [isClient, setIsClient] = useState(false);
@@ -42,11 +43,18 @@ export default function ReviewPage() {
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-      // Fetch Cost Metrics
+      // Fetch Cost Metrics (raw token/page counts from backend)
       const statusRes = await fetch(`${API_BASE_URL}/api/status/${tid}`);
       if (statusRes.ok) {
         const statusData = await statusRes.json();
         if (statusData.cost_metrics) setCostMetrics(statusData.cost_metrics);
+      }
+
+      // Fetch user-configured pricing from settings.json
+      const settingsRes = await fetch('/api/settings');
+      if (settingsRes.ok) {
+        const settingsData = await settingsRes.json();
+        if (!settingsData.error) setPricingSettings(settingsData);
       }
 
       // Fetch the actual DOCX file
@@ -90,6 +98,31 @@ export default function ReviewPage() {
       });
     }
   }, [isLoading, loadError, docBlob]);
+
+  // Dynamic cost calculation using user-configured pricing from settings.json
+  const computedCost = useMemo(() => {
+    if (!costMetrics || !pricingSettings) return null;
+
+    // settings.json stores rates as "per 1M tokens" and "per 1K pages"
+    const visionInputRate = (pricingSettings.visionInput || 0) / 1_000_000;
+    const visionOutputRate = (pricingSettings.visionOutput || 0) / 1_000_000;
+    const llmInputRate = (pricingSettings.llmInput || 0) / 1_000_000;
+    const llmCompletionRate = (pricingSettings.llmCompletion || 0) / 1_000_000;
+    const cuPageRate = (pricingSettings.contentUnderstanding || 0) / 1_000;
+    const exchangeRate = pricingSettings.exchangeRate || 4.20;
+
+    let costUsd = 0;
+    costUsd += (costMetrics.vision_tokens_prompt || 0) * visionInputRate;
+    costUsd += (costMetrics.vision_tokens_completion || 0) * visionOutputRate;
+    costUsd += (costMetrics.llm_tokens_prompt || 0) * llmInputRate;
+    costUsd += (costMetrics.llm_tokens_completion || 0) * llmCompletionRate;
+    costUsd += (costMetrics.content_understanding_pages || 0) * cuPageRate;
+
+    return {
+      costUsd,
+      costMyr: costUsd * exchangeRate
+    };
+  }, [costMetrics, pricingSettings]);
 
   const handleRetry = () => {
     if (!taskId) return;
@@ -246,7 +279,22 @@ export default function ReviewPage() {
             />
           </div>
 
-          {/* Cost Metrics */}
+          {/* Cost Metrics — Dynamically computed using user-configured pricing */}
+          {computedCost && (
+            <div className="mb-4 p-3 bg-light rounded border">
+              <Text type="secondary" className="fw-bold d-block mb-1" style={{ fontSize: "12px", letterSpacing: "0.5px" }}>
+                ESTIMATED GENERATION COST
+              </Text>
+              <Text className="fs-4 fw-bold text-success">
+                RM {computedCost.costMyr.toFixed(2)}
+              </Text>
+              <Text type="secondary" className="d-block mt-1" style={{ fontSize: "12px" }}>
+                (USD ${computedCost.costUsd.toFixed(4)})
+              </Text>
+            </div>
+          )}
+
+          {/* --- OLD HARDCODED COST DISPLAY (fallback reference) ---
           {costMetrics && costMetrics.total_cost_myr !== undefined && (
             <div className="mb-4 p-3 bg-light rounded border">
               <Text type="secondary" className="fw-bold d-block mb-1" style={{ fontSize: "12px", letterSpacing: "0.5px" }}>
@@ -257,6 +305,7 @@ export default function ReviewPage() {
               </Text>
             </div>
           )}
+          */}
         </div>
 
         {/* Action Buttons */}

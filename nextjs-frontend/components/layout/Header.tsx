@@ -1,58 +1,6 @@
-// "use client";
-
-// import { FileTextOutlined } from "@ant-design/icons";
-// import Link from "next/link";
-// import { usePathname } from "next/navigation";
-
-// export default function Header() {
-//     const pathname = usePathname();
-
-//     // Simple logic to highlight the correct step in the progress indicator
-//     let step = 1;
-//     if (pathname === "/preview") step = 2;
-//     else if (pathname === "/processing") step = 3;
-//     else if (pathname === "/edit") step = 4;
-
-//     return (
-//         <header className="bg-white border-bottom px-4 py-3 d-flex align-items-center justify-content-between sticky-top">
-//             {/* Brand Logo & Name */}
-//             <div className="d-flex align-items-center">
-//                 <div
-//                     className="bg-primary text-white d-flex align-items-center justify-content-center me-3"
-//                     style={{ width: "40px", height: "40px", fontSize: "20px", borderRadius: "8px" }}
-//                 >
-//                     <FileTextOutlined />
-//                 </div>
-//                 <h5 className="mb-0 fw-semibold text-dark d-flex align-items-center" style={{ fontSize: "1.15rem" }}>
-//                     Design Document Generator
-//                 </h5>
-//             </div>
-
-//             {/* Stepper & Help */}
-//             <div className="d-flex align-items-center">
-//                 {/* Dynamic Progress Indicator */}
-//                 <div className="d-flex align-items-center gap-2">
-//                     {[1, 2, 3, 4].map((s) => (
-//                         <div
-//                             key={s}
-//                             className={`rounded-pill ${s <= step ? "bg-primary" : "bg-secondary bg-opacity-25"}`}
-//                             style={{ height: "4px", width: "40px", transition: "all 0.3s ease" }}
-//                         ></div>
-//                     ))}
-//                 </div>
-
-//                 {/* <Link href="/help" className="text-secondary fw-bold text-decoration-none" style={{ fontSize: "0.85rem", letterSpacing: "0.5px" }}>
-//                     HELP
-//                 </Link> */}
-//             </div>
-//         </header>
-//     );
-// }
-
-
 "use client";
 
-import { FileTextOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { FileTextOutlined, ExclamationCircleOutlined, HistoryOutlined, SettingOutlined } from "@ant-design/icons";
 import { usePathname, useRouter } from "next/navigation";
 import { Modal } from "antd";
 
@@ -66,6 +14,27 @@ export default function Header() {
     if (pathname === "/preview" || pathname.endsWith("/setup")) step = 2;
     else if (pathname === "/processing" || pathname.endsWith("/processing")) step = 3;
     else if (pathname === "/edit" || pathname.endsWith("/review")) step = 4;
+
+    const tabItems = [
+        {
+            path: '/',
+            label: 'Generate',
+            icon: <FileTextOutlined />,
+            disabled: false
+        },
+        {
+            path: '/history',
+            label: 'History',
+            icon: <HistoryOutlined />,
+            disabled: true // Set to true to disable this button
+        },
+        {
+            path: '/settings',
+            label: 'Settings',
+            icon: <SettingOutlined />,
+            disabled: false
+        },
+    ];
 
     const handleLogoClick = () => {
         // If the user is already on the home page, do nothing
@@ -100,13 +69,48 @@ export default function Header() {
                     <FileTextOutlined />
                 </div>
                 <h5 className="mb-0 fw-semibold text-dark d-flex align-items-center" style={{ fontSize: "1.15rem" }}>
-                    Design Document Generator
+                    Enfrasys Document Generator
                 </h5>
             </div>
 
+            <div>
+                <div className="d-flex align-items-center" style={{ gap: "8px" }}>
+                    {tabItems.map((item) => {
+                        // Check if the current path matches the item's path
+                        // For Dashboard ('/'), we want an exact match.
+                        // For others, we check if it starts with the path.
+                        const isActive = item.path === '/' ? pathname === '/' : pathname.startsWith(item.path);
+                        return (
+                            <button
+                                key={item.path}
+                                onClick={() => {
+                                    if (!item.disabled) router.push(item.path);
+                                }}
+                                disabled={item.disabled}
+                                className="btn d-flex align-items-center gap-2 border-0 shadow-none"
+                                style={{
+                                    padding: "8px 16px",
+                                    borderRadius: "8px",
+                                    fontSize: "15px",
+                                    fontWeight: isActive ? "600" : "500",
+                                    color: item.disabled ? "#adb5bd" : (isActive ? "#1c2b36" : "#6c757d"),
+                                    backgroundColor: isActive ? "#f0f4f8" : "transparent",
+                                    transition: "all 0.2s ease",
+                                    cursor: item.disabled ? "not-allowed" : "pointer",
+                                    opacity: item.disabled ? 0.6 : 1
+                                }}
+                            >
+                                <span style={{ fontSize: "16px" }}>{item.icon}</span>
+                                <span>{item.label}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
             {/* Stepper & Help */}
-            <div className="d-flex align-items-center">
-                {/* Dynamic Progress Indicator */}
+            {/* Dynamic Progress Indicator */}
+            {/* <div className="d-flex align-items-center">
                 <div className="d-flex align-items-center gap-2">
                     {[1, 2, 3, 4].map((s) => (
                         <div
@@ -116,7 +120,8 @@ export default function Header() {
                         ></div>
                     ))}
                 </div>
-            </div>
+            </div> */}
+
         </header>
     );
 }
