@@ -12,7 +12,7 @@ import {
   ArrowLeftOutlined,
   UndoOutlined
 } from "@ant-design/icons";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { renderAsync } from "docx-preview";
 
 const { Text, Title } = Typography;
@@ -20,7 +20,9 @@ const { Text, Title } = Typography;
 export default function ReviewPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const taskId = params.taskId as string;
+  const isFromHistory = searchParams.get('from') === 'history';
 
   const [docName, setDocName] = useState("Generated_Design_Document");
   const [costMetrics, setCostMetrics] = useState<any>(null);
@@ -28,6 +30,7 @@ export default function ReviewPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [isClient, setIsClient] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // NEW: State to hold the downloaded document before rendering
   const [docBlob, setDocBlob] = useState<Blob | null>(null);
@@ -48,6 +51,7 @@ export default function ReviewPage() {
       if (statusRes.ok) {
         const statusData = await statusRes.json();
         if (statusData.cost_metrics) setCostMetrics(statusData.cost_metrics);
+        if (statusData.generated_filename) setDocName(statusData.generated_filename);
       }
 
       // Fetch user-configured pricing from settings.json
@@ -133,7 +137,7 @@ export default function ReviewPage() {
     setIsClient(true);
     const storedPreviewText = sessionStorage.getItem("documentPreview");
 
-    if (storedPreviewText) {
+    if (storedPreviewText && !isFromHistory) {
       try {
         const preview = JSON.parse(storedPreviewText);
         let rawName = preview.filename || "Generated_Design_Document";
@@ -156,13 +160,32 @@ export default function ReviewPage() {
     }
   }, [router, fetchDocxData, taskId]);
 
-  const handleDownloadDocx = () => {
+  const handleDownloadDocx = async () => {
     if (!taskId) return;
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    window.open(
-      `${API_BASE_URL}/api/download/${taskId}?filename=${encodeURIComponent(docName)}`,
-      "_blank"
-    );
+    setIsDownloading(true);
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const response = await fetch(`${API_BASE_URL}/api/download/${taskId}?filename=${encodeURIComponent(docName)}`);
+      
+      if (!response.ok) {
+        throw new Error("Failed to download document");
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${docName}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Download error:", error);
+      alert("Failed to download the document. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const handleStartOver = () => {
@@ -267,13 +290,14 @@ export default function ReviewPage() {
           {/* Rename Field */}
           <div className="mb-4">
             <Text type="secondary" className="fw-bold d-block mb-2" style={{ fontSize: "12px", letterSpacing: "0.5px" }}>
-              FILE NAME
+              {isFromHistory ? "FILE NAME" : "RENAME FILE"}
             </Text>
             <Input
               size="large"
               value={docName}
               onChange={(e) => setDocName(e.target.value)}
-              suffix={<EditOutlined className="text-muted" />}
+              disabled={isFromHistory}
+              suffix={!isFromHistory && <EditOutlined className="text-muted" />}
               addonAfter={<span style={{ fontWeight: 500, color: "#666" }}>.docx</span>}
               style={{ fontWeight: 500 }}
             />
@@ -316,13 +340,15 @@ export default function ReviewPage() {
             block
             icon={<FileWordOutlined className="me-2 text-white" />}
             onClick={handleDownloadDocx}
-            disabled={isLoading}
-            className="mb-3 fw-medium text-white"
+            disabled={isLoading || isDownloading}
+            loading={isDownloading}
+            className={`fw-medium text-white ${!isFromHistory ? 'mb-3' : ''}`}
             style={{ height: "50px", backgroundColor: "#2b5aee" }}
           >
             Download DOCX
           </Button>
 
+          {!isFromHistory && (
           <Button
             danger
             block
@@ -334,6 +360,7 @@ export default function ReviewPage() {
           >
             Start Over
           </Button>
+          )}
         </div>
       </div>
     </div>

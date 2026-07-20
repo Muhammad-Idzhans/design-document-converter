@@ -26,7 +26,7 @@ export default function Header() {
             path: '/history',
             label: 'History',
             icon: <HistoryOutlined />,
-            disabled: true // Set to true to disable this button
+            disabled: false
         },
         {
             path: '/settings',

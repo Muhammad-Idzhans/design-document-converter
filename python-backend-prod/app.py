@@ -15,13 +15,34 @@ from typing import Optional, Dict, Any, List
 
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from pptx import Presentation
 from dotenv import load_dotenv
+import datetime
+from azure.cosmos import CosmosClient
+
+# ✅ LOAD .env FIRST — before ANY os.getenv() calls
+load_dotenv()
 
 class ProcessRequest(BaseModel):
     updated_notes: Optional[Dict[str, str]] = None
+
+# Initialize Cosmos DB Client for Tasks (now env vars are available)
+cosmos_client = None
+cosmos_tasks_container = None
+try:
+    cosmos_uri = os.getenv("COSMOS_DB_URI")
+    cosmos_key = os.getenv("COSMOS_DB_KEY")
+    if cosmos_uri and cosmos_key:
+        cosmos_client = CosmosClient(cosmos_uri, credential=cosmos_key)
+        database = cosmos_client.get_database_client(os.getenv("COSMOS_DB_DATABASE", "design-doc-generator"))
+        cosmos_tasks_container = database.get_container_client(os.getenv("COSMOS_DB_TASKS_CONTAINER", "tasks"))
+        print("[CosmosDB] Connected to Tasks Container.")
+    else:
+        print("[CosmosDB] URI or Key missing from .env file, skipping Cosmos DB init.")
+except Exception as e:
+    print(f"[CosmosDB] Initialization failed: {e}")
 
 from docx import Document
 from docx.oxml import OxmlElement
@@ -33,7 +54,10 @@ try:
 except ImportError:
     print("[ImportWarning] AzureOpenAI package not installed, some features may be unavailable.")
 
-load_dotenv()
+try:
+    from azure.storage.blob import BlobServiceClient
+except ImportError:
+    print("[ImportWarning] azure.storage.blob package not installed. Blob upload will be unavailable.")
 
 # -----------------------------
 # Environment & Paths
@@ -255,6 +279,43 @@ async def api_health_check():
 
 
 # -----------------------------
+# Azure Blob Storage Helper
+# -----------------------------
+def upload_task_to_blob(task_id: str, task_dir: Path):
+    """Upload key task outputs to Azure Blob Storage after generation."""
+    conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+    container = os.getenv("AZURE_BLOB_CONTAINER_NAME", "dev-designdocument-storage")
+    if not conn_str:
+        print("[upload_task_to_blob] No connection string, skipping blob upload")
+        return
+    
+    try:
+        blob_service = BlobServiceClient.from_connection_string(conn_str)
+        container_client = blob_service.get_container_client(container)
+        
+        # Files to upload (only the final outputs, not working copies)
+        files_to_upload = [
+            "Solution_Design_Document.docx",
+            "FINAL_DESIGN_DOCUMENT.md",
+            "extraction_payload.json",
+        ]
+        # Also upload slide thumbnails
+        for f in task_dir.glob("slide_*.jpg"):
+            files_to_upload.append(f.name)
+        
+        for filename in files_to_upload:
+            filepath = task_dir / filename
+            if filepath.exists():
+                blob_name = f"{task_id}/{filename}"
+                with open(filepath, "rb") as data:
+                    container_client.upload_blob(blob_name, data, overwrite=True)
+        
+        print(f"[upload_task_to_blob] Uploaded outputs for task {task_id}")
+    except Exception as e:
+        print(f"[upload_task_to_blob] Upload failed (non-critical): {e}")
+
+
+# -----------------------------
 # Task Store (Azure-safe + less corruption risk)
 # -----------------------------
 def load_tasks() -> Dict[str, Any]:
@@ -280,10 +341,48 @@ def update_task(task_id: str, updates: Dict[str, Any]) -> None:
             tasks[task_id] = {}
         tasks[task_id].update(updates)
         save_tasks(tasks)
+        
+        # Phase 3: Hybrid Cosmos DB approach
+        status = tasks[task_id].get("status")
+        if status in ["completed", "failed"] and cosmos_tasks_container is not None:
+            try:
+                task_record = dict(tasks[task_id])
+                task_record["id"] = task_id
+                task_record["taskId"] = task_id
+                cosmos_tasks_container.upsert_item(task_record)
+                print(f"[CosmosDB] Upserted final task {task_id} successfully.")
+                
+                # Phase 4: Automatic Server Cleanup
+                import shutil
+                task_dir = UPLOAD_DIR / task_id
+                if task_dir.exists():
+                    shutil.rmtree(task_dir, ignore_errors=True)
+                    print(f"[Cleanup] Deleted local files for task {task_id}")
+                    
+                if task_id in tasks:
+                    del tasks[task_id]
+                    save_tasks(tasks)
+                    print(f"[Cleanup] Removed task {task_id} from local tasks_db.json")
+                    
+            except Exception as e:
+                print(f"[CosmosDB/Cleanup] Failed to upsert/cleanup task {task_id}: {e}")
 
 def get_task(task_id: str) -> Optional[Dict[str, Any]]:
     tasks = load_tasks()
-    return tasks.get(task_id)
+    task = tasks.get(task_id)
+    if task:
+        return task
+        
+    # Phase 3 fallback: if not in local JSON, try Cosmos DB
+    if cosmos_tasks_container is not None:
+        try:
+            response = cosmos_tasks_container.read_item(item=task_id, partition_key=task_id)
+            return response
+        except Exception as e:
+            # Usually means Not Found (404)
+            pass
+            
+    return None
 
 
 # -----------------------------
@@ -2249,6 +2348,10 @@ async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File
         "status": "processing_upload",
         "step_name": "Saving files to Azure...",
         "progress": 5,
+        "filename": src_name,
+        "documentType": "Design Document",
+        "createdAt": datetime.datetime.utcnow().isoformat() + "Z",
+        "blobPath": f"{task_id}/Solution_Design_Document.docx",
         "cost_metrics": {
             "vision_tokens_prompt": 0,
             "vision_tokens_completion": 0,
@@ -2410,13 +2513,30 @@ def background_processing(task_id: str):
             
             update_task(task_id, {"cost_metrics": metrics})
 
+        # Upload to blob storage (non-blocking, failure won't break the pipeline)
+        try:
+            upload_task_to_blob(task_id, task_dir)
+        except Exception as e:
+            print(f"[background_processing] Blob upload failed (non-critical): {e}")
+
+        # Calculate final filename
+        import re
+        raw_name = task.get("filename", "source.pptx")
+        if raw_name.startswith("source_"):
+            raw_name = raw_name[7:]
+        if raw_name.lower().endswith(".pptx"):
+            raw_name = raw_name[:-5]
+        safe_name = re.sub(r'[\s-]+', '_', raw_name)
+        generated_filename = f"generated_{safe_name}"
+
         update_task(task_id, {
             "status": "completed",
             "step_name": "Ready!",
             "progress": 100,
             "result_docx": str(docx_path.resolve()),
             "markdown_draft": markdown_text,
-            "asset_library": asset_library
+            "asset_library": asset_library,
+            "generated_filename": generated_filename
         })
 
     except Exception as e:
@@ -2479,6 +2599,9 @@ async def get_status(task_id: str):
             preview["filename"] = task.get("filename")
         response["preview_data"] = preview
 
+    if "generated_filename" in task:
+        response["generated_filename"] = task["generated_filename"]
+
     if "cost_metrics" in task:
         response["cost_metrics"] = task["cost_metrics"]
 
@@ -2497,11 +2620,74 @@ async def download_doc(task_id: str, filename: str = None):
     # Use the filename provided by the frontend, or fallback to a default
     final_filename = filename if filename else "generated_design_document"
 
+    # Try fetching from Azure Blob Storage first
+    conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+    container = os.getenv("AZURE_BLOB_CONTAINER_NAME", "dev-designdocument-storage")
+    
+    if conn_str:
+        try:
+            blob_service = BlobServiceClient.from_connection_string(conn_str)
+            blob_client = blob_service.get_blob_client(container=container, blob=f"{task_id}/Solution_Design_Document.docx")
+            
+            if blob_client.exists():
+                stream = blob_client.download_blob().chunks()
+                return StreamingResponse(
+                    stream,
+                    media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    headers={"Content-Disposition": f'attachment; filename="{final_filename}.docx"'}
+                )
+        except Exception as e:
+            print(f"[download_doc] Blob fetch failed, falling back to local: {e}")
+
+    # Fallback to local file if blob is unavailable
     return FileResponse(
         path=task["result_docx"],
         filename=f"{final_filename}.docx",
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
+
+@app.delete("/api/tasks/{task_id}")
+async def delete_task(task_id: str):
+    # 1. Delete from Cosmos DB
+    cosmos_deleted = False
+    if cosmos_tasks_container is not None:
+        try:
+            cosmos_tasks_container.delete_item(item=task_id, partition_key=task_id)
+            cosmos_deleted = True
+            print(f"[Delete] Task {task_id} removed from Cosmos DB.")
+        except Exception as e:
+            print(f"[Delete] Cosmos DB delete failed or item not found: {e}")
+
+    # 2. Delete from Azure Blob Storage
+    blob_deleted_count = 0
+    conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+    container = os.getenv("AZURE_BLOB_CONTAINER_NAME", "dev-designdocument-storage")
+    if conn_str:
+        try:
+            blob_service = BlobServiceClient.from_connection_string(conn_str)
+            container_client = blob_service.get_container_client(container)
+            
+            # List all blobs under the task_id prefix and delete them
+            blobs = container_client.list_blobs(name_starts_with=f"{task_id}/")
+            for blob in blobs:
+                container_client.delete_blob(blob.name)
+                blob_deleted_count += 1
+            print(f"[Delete] Removed {blob_deleted_count} blobs for task {task_id}.")
+        except Exception as e:
+            print(f"[Delete] Blob storage delete failed: {e}")
+
+    # 3. Clean up any local files just in case
+    import shutil
+    task_dir = UPLOAD_DIR / task_id
+    if task_dir.exists():
+        shutil.rmtree(task_dir, ignore_errors=True)
+        
+    return {
+        "status": "success", 
+        "message": f"Task {task_id} deleted.",
+        "cosmos_deleted": cosmos_deleted,
+        "blobs_deleted": blob_deleted_count
+    }
 
 
 if __name__ == "__main__":
