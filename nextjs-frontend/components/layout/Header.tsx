@@ -36,22 +36,35 @@ export default function Header() {
         },
     ];
 
-    const handleLogoClick = () => {
-        // If the user is already on the home page, do nothing
-        if (pathname === "/") return;
+    // Check if user is in an active workflow (setup or processing)
+    const isInActiveWorkflow = pathname.endsWith("/setup") || pathname === "/preview"
+        || pathname.endsWith("/processing") || pathname === "/processing";
 
-        Modal.confirm({
-            title: "Generate New Document",
-            icon: <ExclamationCircleOutlined />,
-            content: "Are you sure you want to start over? Any generated files that you haven’t downloaded yet will be lost.",
-            okText: "Yes, start over",
-            cancelText: "Cancel",
-            okButtonProps: { danger: true },
-            onOk() {
-                sessionStorage.clear();
-                router.push("/");
-            },
-        });
+    const navigateWithGuard = (targetPath: string) => {
+        // If already on the target page, do nothing
+        if (pathname === targetPath) return;
+
+        if (isInActiveWorkflow) {
+            Modal.confirm({
+                title: "Leave Current Process?",
+                icon: <ExclamationCircleOutlined />,
+                content: "You are currently in the middle of a document generation process. Are you sure you want to leave?",
+                okText: "Yes, leave",
+                cancelText: "Cancel",
+                okButtonProps: { danger: true },
+                onOk() {
+                    sessionStorage.clear();
+                    router.push(targetPath);
+                },
+            });
+        } else {
+            router.push(targetPath);
+        }
+    };
+
+    const handleLogoClick = () => {
+        if (pathname === "/") return;
+        navigateWithGuard("/");
     };
 
     return (
@@ -84,7 +97,7 @@ export default function Header() {
                             <button
                                 key={item.path}
                                 onClick={() => {
-                                    if (!item.disabled) router.push(item.path);
+                                    if (!item.disabled) navigateWithGuard(item.path);
                                 }}
                                 disabled={item.disabled}
                                 className="btn d-flex align-items-center gap-2 border-0 shadow-none"

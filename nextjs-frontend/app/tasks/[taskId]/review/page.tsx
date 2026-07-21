@@ -189,18 +189,8 @@ export default function ReviewPage() {
   };
 
   const handleStartOver = () => {
-    Modal.confirm({
-      title: "Start Over",
-      icon: <ExclamationCircleOutlined />,
-      content: "Are you sure you want to start over? Any generated files that you haven't downloaded yet will be lost.",
-      okText: "Yes, start over",
-      cancelText: "Cancel",
-      okButtonProps: { danger: true },
-      onOk() {
-        sessionStorage.clear();
-        router.push("/");
-      },
-    });
+    sessionStorage.clear();
+    router.push("/");
   };
 
   if (!isClient) return null;
