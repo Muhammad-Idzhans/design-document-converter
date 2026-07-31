@@ -98,6 +98,10 @@ ORCHESTRATOR_DEPLOYMENT = os.getenv("ORCHESTRATOR_DEPLOYMENT", "gpt-4.1")
 WRITER_DEPLOYMENT = os.getenv("WRITER_DEPLOYMENT", "gpt-4.1")
 AGENT_ASSISTANT_ID = os.getenv("AGENT_ASSISTANT_ID", "")
 
+# Environment prefix for task IDs — isolates dev records from production
+# Set ENV_PREFIX="dev-" locally; leave empty in the deployed Web App.
+ENV_PREFIX = os.getenv("ENV_PREFIX", "")
+
 # -----------------------------
 # Pricing Details (USD) & Conversions
 # -----------------------------
@@ -2380,7 +2384,7 @@ def convert_md_to_docx(md_path, docx_path, document_title, project_title, client
 # -----------------------------
 @app.post("/api/upload")
 async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...), logo: UploadFile = File(None)):
-    task_id = str(uuid.uuid4())
+    task_id = f"{ENV_PREFIX}{uuid.uuid4()}"
     task_dir = UPLOAD_DIR / task_id
     task_dir.mkdir(parents=True, exist_ok=True)
 
@@ -2764,7 +2768,7 @@ async def delete_task(task_id: str):
         "blobs_deleted": blob_deleted_count
     }
 
-
+5
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))
