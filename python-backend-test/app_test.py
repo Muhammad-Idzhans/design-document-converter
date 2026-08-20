@@ -18,6 +18,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from pptx import Presentation
+# from dotenv import load_dotenv
+# import datetime
+# from azure.cosmos import CosmosClient
+
+# class ProcessRequest(BaseModel):
+#     updated_notes: Optional[Dict[str, str]] = None
+
+# # Initialize Cosmos DB Client for Tasks
+# cosmos_client = None
+# cosmos_tasks_container = None
+# try:
+#     cosmos_uri = os.getenv("COSMOS_DB_URI")
+#     cosmos_key = os.getenv("COSMOS_DB_KEY")
+#     if cosmos_uri and cosmos_key:
+#         cosmos_client = CosmosClient(cosmos_uri, credential=cosmos_key)
+#         database = cosmos_client.get_database_client(os.getenv("COSMOS_DB_DATABASE", "design-doc-generator"))
+#         cosmos_tasks_container = database.get_container_client(os.getenv("COSMOS_DB_TASKS_CONTAINER", "tasks"))
+#         print("[CosmosDB] Connected to Tasks Container.")
+# except Exception as e:
+#     print(f"[CosmosDB] Initialization failed: {e}")
+
 from dotenv import load_dotenv
 import datetime
 from azure.cosmos import CosmosClient
@@ -77,22 +98,9 @@ ORCHESTRATOR_DEPLOYMENT = os.getenv("ORCHESTRATOR_DEPLOYMENT", "gpt-4.1")
 WRITER_DEPLOYMENT = os.getenv("WRITER_DEPLOYMENT", "gpt-4.1")
 AGENT_ASSISTANT_ID = os.getenv("AGENT_ASSISTANT_ID", "")
 
-# -----------------------------
-# Pricing Details (USD) & Conversions
-# -----------------------------
-# Using standard pay-as-you-go Microsoft Foundry pricing for GPT-4.1
-USD_TO_MYR_RATE = float(os.getenv("USD_TO_MYR_RATE", "4.20"))
-
-# GPT-4o Vision Pricing
-RATE_VISION_PROMPT = 0.0025 / 1000      # GPT-4o Global Text/Vision input ($2.50 per 1M)
-RATE_VISION_COMPLETION = 0.010 / 1000   # GPT-4o Global Text/Vision output ($10 per 1M)
-
-# GPT-4.1 Text Pricing
-RATE_LLM_PROMPT = 0.002 / 1000         # GPT-4.1 Global Text input ($2 per 1M)
-RATE_LLM_COMPLETION = 0.008 / 1000     # GPT-4.1 Global Text output ($8 per 1M)
-
-# Content Understanding Base Extraction ($5 per 1k pages) + Estimated LLM Field Extraction
-RATE_CU_PER_PAGE = 0.005               # Base extraction cost only
+# Environment prefix for task IDs — isolates dev records from production
+# Set ENV_PREFIX="dev-" locally; leave empty in the deployed Web App.
+ENV_PREFIX = os.getenv("ENV_PREFIX", "")
 
 SCRIPT_DIR = Path(__file__).parent
 
@@ -568,11 +576,6 @@ def extract_shapes(shapes, slide_info: Dict[str, Any], ctx: Dict[str, Any]) -> N
                 if text and text != slide_info.get("title"):
                     slide_info["text_content"].append(text)
 
-        # if shape.shape_type == 13:
-        #     ctx["image_counter"] += 1
-        #     img = shape.image
-        #     ext = img.content_type.split("/")[-1]
-
         if shape.shape_type == 13:
             # Safely try to access shape.image — some PPTX files have linked
             # or broken image references that raise AttributeError.
@@ -913,7 +916,7 @@ def generate_table_of_contents(task_id: str, extraction_payload: Dict[str, Any])
         "   - Next: Network & Security Design (Include Sub-sections for Connectivity, Gateways, or NSGs ONLY if present in the data)\n"
         "   - Next: Roles and Access (Include Sub-sections for Admin Roles, Conditional Access, or Workspace Mapping ONLY if present)\n"
         "   - Next: Platform Design & Decisions (Include Sub-sections for Workflows, Resource Organization, or Data Governance ONLY if present)\n"
-        "       SPECIAL HANDLING FOR MULTI-PART SETTINGS TABLES: If the slides contain multiple parts of the same settings table (e.g., 'Settings Part 1/4', 'Settings Part 2/4', 'Settings Part 3/4', 'Settings Part 4/4', or 'Meetings Settings 1/7' through 'Meetings Settings 7/7'), you MUST create a SEPARATE sub-section for EACH part. Do NOT combine multiple parts into one mega-section. For example, if there are 7 parts of Meetings Settings, create 7 sub-sections (e.g., '6.X.1 Meetings Settings (Part 1 of 7)', '6.X.2 Meetings Settings (Part 2 of 7)', etc.). In the generation_instructions for each sub-section, explicitly state: 'Reproduce the policy/settings table from this slide EXACTLY as written. Do not paraphrase or summarize. Apply the FAITHFUL TRANSCRIPTION RULE.'\n"
+        "       SPECIAL HANDLING FOR MULTI-PART SETTINGS TABLES: If the slides contain multiple parts of the same settings table (e.g., 'Settings Part 1/4', 'Settings Part 2/4', 'Settings Part 3/4', 'Settings Part 4/4', or 'Meetings Settings 1/7' through 'Meetings Settings 7/7'), you MUST combine all parts into a SINGLE sub-section. Do NOT create separate sub-sections for each part. For example, if there are 7 parts of Meetings Settings, create only ONE sub-section titled '6.X Meetings Settings' (do NOT include 'Part X of Y' in the title) and instruct the Writer to combine the rows from all parts into one consolidated markdown table. In the generation_instructions for this sub-section, explicitly state: 'Combine the policy/settings tables from these slides into one single table. Do not paraphrase or summarize. Apply the FAITHFUL TRANSCRIPTION RULE.'\n"
         "   - Next: Deployment & Migration Approach (Include ONLY if the slides contain migration timelines, phases, or strategies)\n"
         "   - DO NOT INCLUDE AN APPENDIX SECTION. The Appendix will be generated separately by a dedicated agent after the main content is complete. Stop the TOC at the last main content section (Deployment & Migration Approach or whichever is last).\n"
         "4. Output the outline strictly as a JSON object matching this schema:\n"
@@ -1040,7 +1043,7 @@ def write_document_sections(task_id: str, toc: Dict[str, Any], extraction_payloa
         4. PRESERVE STRUCTURE: If the source slide uses category headers within the table (e.g., "External sharing", "File and folder links", "Unmanaged Device"), preserve these as sub-headings or first-column markers in the output.
         5. NO PARAPHRASING ALLOWED: You are FORBIDDEN from rewording descriptions to "make them sound more professional." The source wording IS the standard.
         6. NO CREATIVE ADDITIONS: Do NOT add your own settings, parameters, or descriptions that are not in the source slides.
-        7. MULTI-PART TABLES: If the source contains "Part 1/4", "Part 2/4", "Part 3/4", "Part 4/4" of the same table, reproduce ALL parts as separate tables under separate sub-headings (e.g., "### SharePoint Online Settings (Part 1 of 4)", "### SharePoint Online Settings (Part 2 of 4)").
+        7. MULTI-PART TABLES: If the source contains multiple parts of the same table (e.g., "Part 1/4", "Part 2/4"), you MUST combine all rows from all parts into a SINGLE continuous table under ONE sub-heading. Remove any "Part X of Y" from the title. The final table should contain all rows from Part 1, followed by Part 2, etc.
 
         NOTE: This rule applies ONLY to policy/settings configuration tables. For all other content (Risk descriptions, Assessment narratives, Technology Overview, Design Decisions, Migration timelines), continue using your default consulting-writing style.
 
@@ -2326,7 +2329,7 @@ def convert_md_to_docx(md_path, docx_path, document_title, project_title, client
 # -----------------------------
 @app.post("/api/upload")
 async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...), logo: UploadFile = File(None)):
-    task_id = str(uuid.uuid4())
+    task_id = f"{ENV_PREFIX}{uuid.uuid4()}"
     task_dir = UPLOAD_DIR / task_id
     task_dir.mkdir(parents=True, exist_ok=True)
 
@@ -2477,6 +2480,7 @@ def background_processing(task_id: str):
         md_file = task_dir / "FINAL_DESIGN_DOCUMENT.md"
         with open(md_file, "w", encoding="utf-8") as f:
             f.write(final_doc_md)
+        # =============================================================================
 
         update_task(task_id, {
             "step_name": "Converting to Word Document",
@@ -2505,6 +2509,9 @@ def background_processing(task_id: str):
                 markdown_text = f.read()
 
         # Final Cost Calculation
+        # NOTE: The actual cost computation has been moved to the frontend (review page)
+        # so it can use user-configured pricing from settings.json.
+        # The backend now only tracks raw usage metrics (token counts + page counts).
         final_task = get_task(task_id)
         if final_task and "cost_metrics" in final_task:
             metrics = final_task["cost_metrics"]
@@ -2689,7 +2696,7 @@ async def delete_task(task_id: str):
         "blobs_deleted": blob_deleted_count
     }
 
-
+5
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))
