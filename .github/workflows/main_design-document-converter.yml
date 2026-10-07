@@ -1,7 +1,4 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
-name: Build and deploy Node.js app to Azure Web App - design-document-converter
+name: Build and deploy Node.js app to Azure Web App - enfrasys-document-generator
 
 on:
   push:
@@ -10,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: design-document-converter
+  AZURE_WEBAPP_NAME: enfrasys-document-generator
   NODE_VERSION: "22.x"
 
 jobs:
@@ -46,10 +43,10 @@ jobs:
           cp -r public .next/standalone/public
           cd .next/standalone && npm pkg set scripts.start="node server.js"
 
-      - name: Deploy to Azure Web App
+      - name: Deploy to Azure Web App (enfrasysdemos)
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           slot-name: "Production"
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_9ABE9E4CDA4A47E3839DA42C7CA16907 }}
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_DOCGEN_FRONTEND }}
           package: nextjs-frontend/.next/standalone
