@@ -14,14 +14,21 @@ const authMiddleware = withAuth({
 
 export default function middleware(req: NextRequest, event: NextFetchEvent) {
   if (isAuthDisabled) {
+    if (req.nextUrl.pathname === "/") {
+      return NextResponse.redirect(new URL("/generate/design-document", req.url));
+    }
+    return NextResponse.next();
+  }
+  if (req.nextUrl.pathname === "/") {
     return NextResponse.next();
   }
   return (authMiddleware as any)(req, event);
 }
 
 export const config = {
-  // Protect all routes inside the (authenticated) group
+  // Match root and all protected routes
   matcher: [
+    "/",
     "/dashboard",
     "/generate/:path*",
     "/history",
