@@ -34,12 +34,12 @@ export async function GET() {
         if (error.code === 404) {
             // Return default settings if DB is completely brand new
             return NextResponse.json({
-                pricing_config: {
-                    gpt_4o_vision: { prompt: 2.50, completion: 10.00 },
-                    gpt_4_1: { prompt: 2.00, completion: 8.00 },
-                    content_understanding: { rate_per_page: 5.00 }
-                },
-                exchange_rates: { USD_TO_MYR: 4.2 }
+                exchangeRate: 4.45,
+                visionInput: 2.50,
+                visionOutput: 10.00,
+                llmInput: 2.00,
+                llmCompletion: 8.00,
+                contentUnderstanding: 5.00
             });
         }
         console.error("Failed to read settings from Cosmos DB:", error);

@@ -1,50 +1,89 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Steps, Button, Spin } from "antd";
 import { CheckCircleFilled, LoadingOutlined } from "@ant-design/icons";
 import { useRouter, useParams } from "next/navigation";
 
-export default function ProcessingPage() {
+interface ProcessingViewProps {
+  generatorType: string; // e.g. "design-document"
+}
+
+export default function ProcessingView({ generatorType }: ProcessingViewProps) {
   const router = useRouter();
   const params = useParams();
   const taskId = params.taskId as string;
+
+  const basePath = `/generate/${generatorType}`;
 
   // UI Loading Steps
   const [currentStep, setCurrentStep] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [stepName, setStepName] = useState("");
+  const notFoundRef = useRef(0);
 
-  const stepsLabels = [
-    "Extracting Content & Images",
-    "Analyzing Architecture Diagrams via Vision AI",
-    "Orchestrating Document Structure",
-    "Drafting Markdown Sections",
-    "Finalizing Word Document Format"
+  // const designDocumentSteps = [
+  //   "Extracting Content & Images",
+  //   "Analyzing Architecture Diagrams via Vision AI",
+  //   "Orchestrating Document Structure",
+  //   "Drafting Markdown Sections",
+  //   "Finalizing Word Document Format"
+  // ];
+
+  // const finalConfigSteps = [
+  //   "Connecting to Azure Tenant",
+  //   "Fetching Azure Resources & Configurations",
+  //   "Orchestrating Document Structure",
+  //   "Drafting Markdown Sections",
+  //   "Finalizing Word Document Format"
+  // ];
+
+  // A step is complete once the backend's progress reaches its doneAt value
+  const designDocumentSteps = [
+    { label: "Extracting Content & Images", doneAt: 50 },
+    { label: "Analyzing Architecture Diagrams via Vision AI", doneAt: 70 },
+    { label: "Orchestrating Document Structure", doneAt: 85 },
+    { label: "Drafting Markdown Sections", doneAt: 95 },
+    { label: "Finalizing Word Document Format", doneAt: 100 },
   ];
+
+  const finalConfigSteps = [
+    { label: "Fetching Azure Resources & Configurations", doneAt: 50 },
+    { label: "Writing Service Overviews with AI", doneAt: 85 },
+    { label: "Building Word Document", doneAt: 100 },
+  ];
+
+  const steps = generatorType === "final-config" ? finalConfigSteps : designDocumentSteps;
+  const stepsLabels = steps.map((s) => s.label);
 
   // 1. On Mount: Validate Task ID
   useEffect(() => {
     if (!taskId) {
-      router.push("/");
+      router.push(basePath);
     }
-  }, [taskId, router]);
+  }, [taskId, router, basePath]);
 
-  // 2. Fake UI Progression (since the backend script blocks synchronously right now)
-  useEffect(() => {
-    if (isCompleted || hasError) return;
+  // // 2. Fake UI Progression (since the backend script blocks synchronously right now)
+  // useEffect(() => {
+  //   if (isCompleted || hasError) return;
 
-    // Slowly increment steps visually up to step 3, wait at step 3 for completion
-    const timers = [
-      setTimeout(() => setCurrentStep(1), 8000),   // After 8s: Move to Vision AI
-      setTimeout(() => setCurrentStep(2), 25000),  // After 25s: Move to Orchestration
-      setTimeout(() => setCurrentStep(3), 60000),  // After 60s: Move to Drafting
-      setTimeout(() => setCurrentStep(4), 110000)  // After 110s: Move to Finalizing
-    ];
+  //   // Slowly increment steps visually up to step 3, wait at step 3 for completion
+  //   const timers = generatorType === "final-config" ? [
+  //     setTimeout(() => setCurrentStep(1), 3000),
+  //     setTimeout(() => setCurrentStep(2), 15000),
+  //     setTimeout(() => setCurrentStep(3), 30000),
+  //     setTimeout(() => setCurrentStep(4), 70000)
+  //   ] : [
+  //     setTimeout(() => setCurrentStep(1), 8000),
+  //     setTimeout(() => setCurrentStep(2), 25000),
+  //     setTimeout(() => setCurrentStep(3), 60000),
+  //     setTimeout(() => setCurrentStep(4), 110000)
+  //   ];
 
-    return () => timers.forEach((t) => clearTimeout(t));
-  }, [isCompleted, hasError]);
+  //   return () => timers.forEach((t) => clearTimeout(t));
+  // }, [isCompleted, hasError]);
 
   // 3. Polling the FastAPI Backend
   useEffect(() => {
@@ -53,23 +92,39 @@ export default function ProcessingPage() {
     const pollInterval = setInterval(async () => {
       try {
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        // const res = await fetch(`${API_BASE_URL}/api/status/${taskId}`);
+        // if (!res.ok) return;
+
+        // const data = await res.json();
+
         const res = await fetch(`${API_BASE_URL}/api/status/${taskId}`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          // 6.4: stop polling if the task keeps returning 404 (about 30 seconds)
+          if (res.status === 404) {
+            notFoundRef.current += 1;
+            if (notFoundRef.current >= 6) {
+              setHasError(true);
+              setErrorMessage("This task could not be found. It may have been deleted or the server was restarted.");
+              clearInterval(pollInterval);
+            }
+          }
+          return;
+        }
+        notFoundRef.current = 0;
 
         const data = await res.json();
 
+        // 6.3: drive the stepper from the backend's real progress
+        if (data.status === "processing") {
+          const progress = Number(data.progress) || 0;
+          setCurrentStep(steps.filter((s) => progress >= s.doneAt).length);
+          if (data.step_name) setStepName(data.step_name);
+        }
+
         if (data.status === "completed") {
           setIsCompleted(true);
-          setCurrentStep(5); // All done!
+          setCurrentStep(steps.length); // All done!
           clearInterval(pollInterval);
-
-          // Save generated content to session storage for the Review Page Phase 4
-          if (data.markdown_draft) {
-            sessionStorage.setItem("documentMarkdown", data.markdown_draft);
-          }
-          if (data.asset_library) {
-            sessionStorage.setItem("documentAssets", JSON.stringify(data.asset_library));
-          }
         }
         else if (data.status === "failed") {
           setHasError(true);
@@ -121,7 +176,14 @@ export default function ProcessingPage() {
           <>
             <div className="text-center mb-5">
               <h2 className="fw-bold fs-3 text-dark mb-2">AI is generating your document ...</h2>
-              <p className="text-muted">This may take 3-5 minutes depending on the length of your presentation.</p>
+              <p className="text-muted">
+                {generatorType === "final-config"
+                  ? "This may take 1-2 minutes depending on the number of resources selected."
+                  : "This may take 3-5 minutes depending on the length of your presentation."}
+              </p>
+              {stepName && !isCompleted && (
+                <p className="text-primary small fw-medium mt-2 mb-0">{stepName}</p>
+              )}
             </div>
 
             <div className="px-md-5 mx-md-4 custom-stepper-wrapper">
@@ -138,7 +200,7 @@ export default function ProcessingPage() {
                 <Button
                   type="primary"
                   size="large"
-                  onClick={() => router.push(`/tasks/${taskId}/review`)}
+                  onClick={() => router.push(`${basePath}/tasks/${taskId}/review`)}
                   style={{
                     height: "50px",
                     padding: "0 40px",
@@ -156,7 +218,6 @@ export default function ProcessingPage() {
         ) : (
           <div className="text-center py-5">
             <div className="mb-4 text-danger">
-              {/* Optional: using a generic failure icon from Ant Design if imported, or just generic styles */}
               <div style={{ fontSize: "64px", lineHeight: 1, marginBottom: "16px" }}>⚠️</div>
             </div>
             <h3 className="fw-bold text-dark mb-2">Processing Failed</h3>
@@ -165,10 +226,10 @@ export default function ProcessingPage() {
               type="primary"
               danger
               size="large"
-              onClick={() => router.push("/")}
+              onClick={() => router.push(basePath)}
               style={{ borderRadius: "8px", padding: "0 30px" }}
             >
-              Return to Upload
+              {generatorType === "final-config" ? "Back to Final Config" : "Return to Upload"}
             </Button>
           </div>
         )}

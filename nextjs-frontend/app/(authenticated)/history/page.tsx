@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Table, Tag, Typography, Dropdown, MenuProps, message, Spin, Modal } from 'antd';
+import { Table, Tag, Typography, Dropdown, MenuProps, message, Spin, Modal, Tooltip } from 'antd';
 import { EyeOutlined, DownloadOutlined, EllipsisOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
+import { resolveCost } from '@/lib/cost';
 
 const { Title, Text } = Typography;
 
@@ -49,9 +50,9 @@ export default function HistoryPage() {
             onOk: async () => {
                 try {
                     const response = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
-                    
+
                     if (!response.ok) throw new Error("Failed to delete task");
-                    
+
                     setTasks(prev => prev.filter(t => t.taskId !== taskId));
                     message.success('Document deleted successfully');
                 } catch (error) {
@@ -139,29 +140,24 @@ export default function HistoryPage() {
             title: 'Cost',
             key: 'cost',
             render: (_: any, record: any) => {
-                if (!settings || !record.cost_metrics) return '-';
-
-                const metrics = record.cost_metrics;
-                const visionInputRate = (settings.visionInput || 0) / 1_000_000;
-                const visionOutputRate = (settings.visionOutput || 0) / 1_000_000;
-                const llmInputRate = (settings.llmInput || 0) / 1_000_000;
-                const llmCompletionRate = (settings.llmCompletion || 0) / 1_000_000;
-                const cuPageRate = (settings.contentUnderstanding || 0) / 1_000;
-                const exchangeRate = settings.exchangeRate || 4.20;
-
-                let costUsd = 0;
-                costUsd += (metrics.vision_tokens_prompt || 0) * visionInputRate;
-                costUsd += (metrics.vision_tokens_completion || 0) * visionOutputRate;
-                costUsd += (metrics.llm_tokens_prompt || 0) * llmInputRate;
-                costUsd += (metrics.llm_tokens_completion || 0) * llmCompletionRate;
-                costUsd += (metrics.content_understanding_pages || 0) * cuPageRate;
-
-                const costMyr = costUsd * exchangeRate;
+                const cost = resolveCost(record, settings);
+                if (!cost) return '-';
 
                 return (
-                    <Text className="fw-medium">
-                        RM{costMyr.toFixed(2)} <Text type="secondary" style={{ fontSize: '13px' }}>(${costUsd.toFixed(2)})</Text>
-                    </Text>
+                    <Tooltip
+                        title={
+                            cost.isLocked
+                                ? `Rate locked at 1 USD = RM ${cost.exchangeRate.toFixed(2)}`
+                                : `Estimated using current rate: 1 USD = RM ${cost.exchangeRate.toFixed(2)}`
+                        }
+                    >
+                        <Text className="fw-medium" style={{ cursor: 'help' }}>
+                            RM{cost.costMyr.toFixed(2)}{' '}
+                            <Text type="secondary" style={{ fontSize: '13px' }}>
+                                (${cost.costUsd.toFixed(2)})
+                            </Text>
+                        </Text>
+                    </Tooltip>
                 );
             },
             width: '15%',
@@ -176,7 +172,7 @@ export default function HistoryPage() {
                         key: 'view',
                         label: 'View Document',
                         icon: <EyeOutlined />,
-                        onClick: () => router.push(`/tasks/${record.taskId}/review?from=history`)
+                        onClick: () => router.push(`/history/${record.taskId}`)
                     },
                     {
                         key: 'download',

@@ -5,10 +5,16 @@ import { Button, Modal, Spin, Input, Badge } from "antd";
 import { PlayCircleOutlined, AppstoreOutlined, EditOutlined } from "@ant-design/icons";
 import { useRouter, useParams } from "next/navigation";
 
-export default function SetupPage() {
+interface SetupViewProps {
+  generatorType: string; // e.g. "design-document"
+}
+
+export default function SetupView({ generatorType }: SetupViewProps) {
   const router = useRouter();
   const params = useParams();
   const taskId = params.taskId as string;
+
+  const basePath = `/generate/${generatorType}`;
   
   const [previewData, setPreviewData] = useState<any>(null);
   const [isClient, setIsClient] = useState(false);
@@ -56,8 +62,8 @@ export default function SetupPage() {
       const res = await fetch(`${API_BASE_URL}/api/process/${taskId}`, fetchOptions);
       if (!res.ok) throw new Error("Failed to start processing");
       
-      // Navigate to Step 3
-      router.push(`/tasks/${taskId}/processing`);
+      // Navigate to processing step using the generator-specific path
+      router.push(`${basePath}/tasks/${taskId}/processing`);
     } catch (err) {
       alert("Failed to connect to backend to start processing.");
       console.error(err);
@@ -95,7 +101,7 @@ export default function SetupPage() {
       <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center bg-light">
         <h4>No slides to preview</h4>
         <p className="text-muted">Please go back to the upload page and submit a PowerPoint file.</p>
-        <Button onClick={() => router.push("/")} type="primary" className="mt-3">Return to Upload</Button>
+        <Button onClick={() => router.push(basePath)} type="primary" className="mt-3">Return to Upload</Button>
       </div>
     );
   }

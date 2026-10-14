@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Card, Input, Button, Divider, Form, message, Row, Col, Typography } from 'antd';
+import { Card, Input, Button, Divider, Form, message, Row, Col, Typography, Space } from 'antd';
 import {
     DollarOutlined,
     SyncOutlined,
@@ -27,17 +27,27 @@ const CurrencyInput = ({ value, onChange, prefix, addonBefore }: { value?: any, 
         onChange?.(numericValue);
     };
 
-    return (
+    const inputNode = (
         <Input
             size="large"
-            addonBefore={addonBefore}
             prefix={prefix}
             value={displayValue}
             onChange={handleChange}
             inputMode="numeric"
-            style={{ borderRadius: "8px" }}
+            style={{ borderRadius: addonBefore ? undefined : "8px" }}
         />
     );
+
+    if (addonBefore) {
+        return (
+            <Space.Compact block size="large">
+                <Space.Addon>{addonBefore}</Space.Addon>
+                {inputNode}
+            </Space.Compact>
+        );
+    }
+
+    return inputNode;
 };
 
 export default function SettingsPage() {

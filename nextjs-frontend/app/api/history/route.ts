@@ -25,7 +25,7 @@ export async function GET() {
 
         // Query all tasks and order by creation time descending (newest first)
         const querySpec = {
-            query: "SELECT c.id, c.taskId, c.filename, c.generated_filename, c.documentType, c.createdAt, c.status, c.cost_metrics, c.blobPath FROM c ORDER BY c.createdAt DESC"
+            query: "SELECT c.id, c.taskId, c.filename, c.generated_filename, c.documentType, c.createdAt, c.status, c.cost_metrics, c.cost_summary, c.blobPath, c.storage FROM c ORDER BY c.createdAt DESC"
         };
 
         const { resources: items } = await container.items.query(querySpec).fetchAll();

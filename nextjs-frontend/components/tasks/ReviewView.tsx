@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { Button, Input, Modal, Spin, FloatButton, Typography } from "antd";
+import { Button, Input, Modal, Spin, FloatButton, Typography, Alert, Space } from "antd";
 import {
   FileWordOutlined,
   EditOutlined,
@@ -14,18 +14,28 @@ import {
 } from "@ant-design/icons";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { renderAsync } from "docx-preview";
+import { resolveCost } from "@/lib/cost";
 
 const { Text, Title } = Typography;
 
-export default function ReviewPage() {
+interface ReviewViewProps {
+  generatorType?: string;   // e.g. "design-document" (not needed when opened from History)
+  fromHistory?: boolean;    // true when rendered under /history/[taskId]
+}
+
+export default function ReviewView({ generatorType = "design-document", fromHistory = false }: ReviewViewProps) {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const taskId = params.taskId as string;
-  const isFromHistory = searchParams.get('from') === 'history';
+  const isFromHistory = fromHistory || searchParams.get('from') === 'history';
+
+  const basePath = fromHistory ? "/history" : `/generate/${generatorType}`;
 
   const [docName, setDocName] = useState("Generated_Design_Document");
+  const [taskRecord, setTaskRecord] = useState<any>(null);
   const [costMetrics, setCostMetrics] = useState<any>(null);
+  const [fetchErrors, setFetchErrors] = useState<any[]>([]);
   const [pricingSettings, setPricingSettings] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -50,11 +60,13 @@ export default function ReviewPage() {
       const statusRes = await fetch(`${API_BASE_URL}/api/status/${tid}`);
       if (statusRes.ok) {
         const statusData = await statusRes.json();
+        setTaskRecord(statusData);
         if (statusData.cost_metrics) setCostMetrics(statusData.cost_metrics);
         if (statusData.generated_filename) setDocName(statusData.generated_filename);
+        if (Array.isArray(statusData.fetch_errors)) setFetchErrors(statusData.fetch_errors);
       }
 
-      // Fetch user-configured pricing from settings.json
+      // Fetch user-configured pricing from settings (used as fallback for legacy records)
       const settingsRes = await fetch('/api/settings');
       if (settingsRes.ok) {
         const settingsData = await settingsRes.json();
@@ -103,30 +115,10 @@ export default function ReviewPage() {
     }
   }, [isLoading, loadError, docBlob]);
 
-  // Dynamic cost calculation using user-configured pricing from settings.json
+  // Unified cost calculation: prefers locked cost_summary snapshot, falls back to settings
   const computedCost = useMemo(() => {
-    if (!costMetrics || !pricingSettings) return null;
-
-    // settings.json stores rates as "per 1M tokens" and "per 1K pages"
-    const visionInputRate = (pricingSettings.visionInput || 0) / 1_000_000;
-    const visionOutputRate = (pricingSettings.visionOutput || 0) / 1_000_000;
-    const llmInputRate = (pricingSettings.llmInput || 0) / 1_000_000;
-    const llmCompletionRate = (pricingSettings.llmCompletion || 0) / 1_000_000;
-    const cuPageRate = (pricingSettings.contentUnderstanding || 0) / 1_000;
-    const exchangeRate = pricingSettings.exchangeRate || 4.20;
-
-    let costUsd = 0;
-    costUsd += (costMetrics.vision_tokens_prompt || 0) * visionInputRate;
-    costUsd += (costMetrics.vision_tokens_completion || 0) * visionOutputRate;
-    costUsd += (costMetrics.llm_tokens_prompt || 0) * llmInputRate;
-    costUsd += (costMetrics.llm_tokens_completion || 0) * llmCompletionRate;
-    costUsd += (costMetrics.content_understanding_pages || 0) * cuPageRate;
-
-    return {
-      costUsd,
-      costMyr: costUsd * exchangeRate
-    };
-  }, [costMetrics, pricingSettings]);
+    return resolveCost(taskRecord, pricingSettings);
+  }, [taskRecord, pricingSettings]);
 
   const handleRetry = () => {
     if (!taskId) return;
@@ -156,9 +148,9 @@ export default function ReviewPage() {
     if (taskId) {
       fetchDocxData(taskId);
     } else {
-      router.push("/");
+      router.push(basePath);
     }
-  }, [router, fetchDocxData, taskId]);
+  }, [router, fetchDocxData, taskId, basePath]);
 
   const handleDownloadDocx = async () => {
     if (!taskId) return;
@@ -166,11 +158,11 @@ export default function ReviewPage() {
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const response = await fetch(`${API_BASE_URL}/api/download/${taskId}?filename=${encodeURIComponent(docName)}`);
-      
+
       if (!response.ok) {
         throw new Error("Failed to download document");
       }
-      
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -190,7 +182,7 @@ export default function ReviewPage() {
 
   const handleStartOver = () => {
     sessionStorage.clear();
-    router.push("/");
+    router.push(basePath);
   };
 
   if (!isClient) return null;
@@ -198,7 +190,7 @@ export default function ReviewPage() {
   return (
     <div
       className="d-flex w-100"
-      style={{ fontFamily: "Inter, sans-serif", backgroundColor: "#f5f5f5", height: "calc(100vh - 73px)", overflow: "hidden" }}
+      style={{ fontFamily: "Inter, sans-serif", backgroundColor: "#f5f5f5", height: "100%", overflow: "hidden" }}
     >
       {/* ── COLUMN 1: DOCUMENT VIEWER (LEFT - SCROLLABLE) ── */}
       <div
@@ -242,7 +234,6 @@ export default function ReviewPage() {
                 maxWidth: "1000px",
                 width: "100%",
                 minHeight: "100%",
-                // padding: "50px",
                 overflowX: "auto"
               }}
             >
@@ -282,44 +273,65 @@ export default function ReviewPage() {
             <Text type="secondary" className="fw-bold d-block mb-2" style={{ fontSize: "12px", letterSpacing: "0.5px" }}>
               {isFromHistory ? "FILE NAME" : "RENAME FILE"}
             </Text>
-            <Input
-              size="large"
-              value={docName}
-              onChange={(e) => setDocName(e.target.value)}
-              disabled={isFromHistory}
-              suffix={!isFromHistory && <EditOutlined className="text-muted" />}
-              addonAfter={<span style={{ fontWeight: 500, color: "#666" }}>.docx</span>}
-              style={{ fontWeight: 500 }}
-            />
+            <Space.Compact block size="large">
+              <Input
+                size="large"
+                value={docName}
+                onChange={(e) => setDocName(e.target.value)}
+                disabled={isFromHistory}
+                suffix={!isFromHistory && <EditOutlined className="text-muted" />}
+                style={{ fontWeight: 500 }}
+              />
+              <Space.Addon>
+                <span style={{ fontWeight: 500, color: "#666" }}>.docx</span>
+              </Space.Addon>
+            </Space.Compact>
           </div>
 
-          {/* Cost Metrics — Dynamically computed using user-configured pricing */}
+          {/* Cost Metrics */}
           {computedCost && (
             <div className="mb-4 p-3 bg-light rounded border">
-              <Text type="secondary" className="fw-bold d-block mb-1" style={{ fontSize: "12px", letterSpacing: "0.5px" }}>
-                ESTIMATED GENERATION COST
-              </Text>
+              <div className="d-flex justify-content-between align-items-center mb-1">
+                <Text type="secondary" className="fw-bold d-block" style={{ fontSize: "12px", letterSpacing: "0.5px" }}>
+                  {computedCost.isLocked ? "GENERATION COST (LOCKED)" : "ESTIMATED GENERATION COST"}
+                </Text>
+                {computedCost.isLocked && (
+                  <span className="badge bg-success-subtle text-success border border-success-subtle" style={{ fontSize: "11px", fontWeight: 600 }}>
+                    Rate Locked
+                  </span>
+                )}
+              </div>
               <Text className="fs-4 fw-bold text-success">
                 RM {computedCost.costMyr.toFixed(2)}
               </Text>
               <Text type="secondary" className="d-block mt-1" style={{ fontSize: "12px" }}>
-                (USD ${computedCost.costUsd.toFixed(4)})
+                USD ${computedCost.costUsd.toFixed(4)} &bull; Rate: 1 USD = RM {computedCost.exchangeRate.toFixed(2)}
               </Text>
             </div>
           )}
 
-          {/* --- OLD HARDCODED COST DISPLAY (fallback reference) ---
-          {costMetrics && costMetrics.total_cost_myr !== undefined && (
-            <div className="mb-4 p-3 bg-light rounded border">
-              <Text type="secondary" className="fw-bold d-block mb-1" style={{ fontSize: "12px", letterSpacing: "0.5px" }}>
-                ESTIMATED GENERATION COST
-              </Text>
-              <Text className="fs-4 fw-bold text-success">
-                RM {Number(costMetrics.total_cost_myr).toFixed(2)}
-              </Text>
-            </div>
+          {/* 6.5: resources that could not be fetched from Azure (left out of the document) */}
+          {fetchErrors.length > 0 && (
+            <Alert
+              type="warning"
+              showIcon
+              className="mb-4"
+              title={`${fetchErrors.length} resource${fetchErrors.length > 1 ? "s were" : " was"} not documented`}
+              description={
+                <div style={{ fontSize: "12px" }}>
+                  <div className="mb-2">These could not be read from Azure, so they are not in the document:</div>
+                  <ul className="mb-0 ps-3">
+                    {fetchErrors.map((e: any, i: number) => (
+                      <li key={i}>
+                        <span className="fw-medium">{String(e.id || "").split("/").pop()}</span>
+                        {e.type ? <span className="text-muted"> ({e.type})</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              }
+            />
           )}
-          */}
         </div>
 
         {/* Action Buttons */}
@@ -332,24 +344,37 @@ export default function ReviewPage() {
             onClick={handleDownloadDocx}
             disabled={isLoading || isDownloading}
             loading={isDownloading}
-            className={`fw-medium text-white ${!isFromHistory ? 'mb-3' : ''}`}
+            className="fw-medium text-white mb-3"
             style={{ height: "50px", backgroundColor: "#2b5aee" }}
           >
             Download DOCX
           </Button>
 
+          {isFromHistory && (
+            <Button
+              block
+              size="large"
+              icon={<ArrowLeftOutlined className="me-2" />}
+              onClick={() => router.push("/history")}
+              className="fw-medium"
+              style={{ height: "50px" }}
+            >
+              Back to History
+            </Button>
+          )}
+
           {!isFromHistory && (
-          <Button
-            danger
-            block
-            size="large"
-            icon={<UndoOutlined className="me-2" />}
-            onClick={handleStartOver}
-            className="fw-medium"
-            style={{ height: "50px" }}
-          >
-            Start Over
-          </Button>
+            <Button
+              danger
+              block
+              size="large"
+              icon={<UndoOutlined className="me-2" />}
+              onClick={handleStartOver}
+              className="fw-medium"
+              style={{ height: "50px" }}
+            >
+              Start Over
+            </Button>
           )}
         </div>
       </div>
