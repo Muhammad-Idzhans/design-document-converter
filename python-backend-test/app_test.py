@@ -264,16 +264,21 @@ async def download_doc(task_id: str, filename: str = "preview"):
 
 @app.delete("/api/tasks/{task_id}")
 async def delete_task_endpoint(task_id: str):
-    results = {"cosmos_deleted": False, "blob_deleted_count": 0, "local_deleted": False}
+    results = {"cosmos_soft_deleted": False, "blob_deleted_count": 0, "local_deleted": False}
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
-    # 1. Delete from Cosmos DB
+    # 1. Soft-delete in Cosmos DB: preserve financial and token analytics, set isDeleted = True
     if cosmos_tasks_container is not None:
         try:
-            cosmos_tasks_container.delete_item(item=task_id, partition_key=task_id)
-            results["cosmos_deleted"] = True
-            print(f"[delete_task] Deleted task {task_id} from Cosmos DB.")
+            item = cosmos_tasks_container.read_item(item=task_id, partition_key=task_id)
+            item["isDeleted"] = True
+            item["deletedAt"] = now_iso
+            item["blobPath"] = None
+            cosmos_tasks_container.upsert_item(item)
+            results["cosmos_soft_deleted"] = True
+            print(f"[delete_task] Soft-deleted task {task_id} in Cosmos DB (isDeleted=True).")
         except Exception as e:
-            print(f"[delete_task] Cosmos DB delete failed for {task_id}: {e}")
+            print(f"[delete_task] Cosmos DB soft delete failed for {task_id}: {e}")
 
     # 2. Delete from Azure Blob Storage (check both dev and prod containers)
     conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")

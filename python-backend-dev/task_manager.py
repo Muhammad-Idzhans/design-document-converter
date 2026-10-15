@@ -60,6 +60,8 @@ def finalize_task_record(task_id: str, raw_task: Dict[str, Any]) -> Dict[str, An
     task_record = dict(raw_task)
     task_record["id"] = task_id
     task_record["taskId"] = task_id
+    if "isDeleted" not in task_record:
+        task_record["isDeleted"] = False
 
     # 1. Lock generation cost snapshot if missing
     if "cost_summary" not in task_record or not task_record["cost_summary"]:

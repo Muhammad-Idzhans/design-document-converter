@@ -19,14 +19,16 @@ export default function HistoryPage() {
         const fetchData = async () => {
             try {
                 const [historyRes, settingsRes] = await Promise.all([
-                    fetch('/api/history'),
+                    fetch('/api/history?active_only=true'),
                     fetch('/api/settings')
                 ]);
 
                 const historyData = await historyRes.json();
                 const settingsData = await settingsRes.json();
 
-                if (historyData.data) setTasks(historyData.data);
+                if (historyData.data) {
+                    setTasks(historyData.data.filter((t: any) => !t.isDeleted));
+                }
                 if (settingsData && !settingsData.error) setSettings(settingsData);
             } catch (error) {
                 console.error("Failed to fetch data:", error);
@@ -43,7 +45,7 @@ export default function HistoryPage() {
         Modal.confirm({
             title: 'Are you sure you want to delete this document?',
             icon: <ExclamationCircleOutlined />,
-            content: 'This will permanently delete the record from the database and the files from cloud storage. This action cannot be undone.',
+            content: 'This will permanently delete the document from cloud storage and remove it from your history list. Historical cost and generation metrics will be retained on the dashboard.',
             okText: 'Yes, delete it',
             okType: 'danger',
             cancelText: 'Cancel',
@@ -66,59 +68,116 @@ export default function HistoryPage() {
     // Column definitions for the Ant Design Table
     const columns = [
         {
-            title: 'Task ID',
+            title: <span style={{ whiteSpace: 'nowrap' }}>Task ID</span>,
             dataIndex: 'taskId',
             key: 'taskId',
-            render: (text: string) => (
-                <Text type="secondary" style={{ fontSize: '13px' }}>
-                    {text.substring(0, 8)}...
-                </Text>
-            ),
-            width: '10%',
+            width: 120,
+            render: (text: string) => {
+                if (!text) return '-';
+                const shortId = text.length > 8 ? `${text.substring(0, 8)}...` : text;
+                return (
+                    <Tooltip title={text} placement="topLeft">
+                        <Text
+                            type="secondary"
+                            style={{
+                                fontSize: '13px',
+                                fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                                whiteSpace: 'nowrap',
+                                cursor: 'default',
+                            }}
+                        >
+                            {shortId}
+                        </Text>
+                    </Tooltip>
+                );
+            },
         },
         {
             title: 'Document',
             key: 'document',
             render: (_: any, record: any) => {
                 const formattedName = record.generated_filename || "Generated_Design_Document";
+                const originalName = record.filename || "Generated_Design_Document";
 
                 return (
-                    <div>
-                        <div className="fw-medium text-dark">{formattedName}</div>
-                        <Text type="secondary" style={{ fontSize: '12px' }}>{record.filename || "Generated_Design_Document"}</Text>
+                    <div style={{ minWidth: 0, maxWidth: '300px' }}>
+                        <Tooltip title={formattedName} placement="topLeft">
+                            <div
+                                className="fw-medium text-dark"
+                                style={{
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    cursor: 'default',
+                                }}
+                            >
+                                {formattedName}
+                            </div>
+                        </Tooltip>
+                        <Tooltip title={originalName} placement="topLeft">
+                            <Text
+                                type="secondary"
+                                style={{
+                                    fontSize: '12px',
+                                    display: 'block',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    cursor: 'default',
+                                }}
+                            >
+                                {originalName}
+                            </Text>
+                        </Tooltip>
                     </div>
                 );
             },
-            width: '35%',
         },
         {
-            title: 'Type',
+            title: <span style={{ whiteSpace: 'nowrap' }}>Type</span>,
             dataIndex: 'documentType',
             key: 'documentType',
-            render: (text: string) => (
-                <Text type="secondary">{text || 'Design Document'}</Text>
-            ),
-            width: '15%',
+            width: 170,
+            render: (text: string) => {
+                const isFinalConfig = text?.toLowerCase().includes('final');
+                const label = isFinalConfig ? 'Final Configuration' : (text || 'Design Document');
+                return (
+                    <Tag
+                        color={isFinalConfig ? 'purple' : 'blue'}
+                        style={{
+                            borderRadius: '4px',
+                            border: 'none',
+                            padding: '2px 8px',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        {label}
+                    </Tag>
+                );
+            },
         },
         {
-            title: 'Date',
+            title: <span style={{ whiteSpace: 'nowrap' }}>Date</span>,
             dataIndex: 'createdAt',
             key: 'date',
+            width: 130,
             render: (text: string) => {
                 if (!text) return '-';
                 return (
-                    <div>
+                    <div style={{ whiteSpace: 'nowrap' }}>
                         <div className="fw-medium text-dark">{dayjs(text).format('D MMM YYYY')}</div>
                         <Text type="secondary" style={{ fontSize: '12px' }}>{dayjs(text).format('h:mm A')}</Text>
                     </div>
                 );
             },
-            width: '15%',
         },
         {
-            title: 'Status',
+            title: <span style={{ whiteSpace: 'nowrap' }}>Status</span>,
             dataIndex: 'status',
             key: 'status',
+            width: 110,
             render: (status: string) => {
                 let color = 'default';
                 let text = status;
@@ -130,15 +189,29 @@ export default function HistoryPage() {
                     text = 'Failed';
                 } else if (status === 'processing_upload') {
                     color = 'processing';
-                    text = 'In review'; // matching your sample image loosely
+                    text = 'In review';
                 }
-                return <Tag color={color} style={{ borderRadius: '4px', border: 'none', padding: '2px 8px' }}>{text}</Tag>;
+                return (
+                    <Tag
+                        color={color}
+                        style={{
+                            borderRadius: '4px',
+                            border: 'none',
+                            padding: '2px 8px',
+                            whiteSpace: 'nowrap',
+                            fontWeight: 500,
+                        }}
+                    >
+                        {text}
+                    </Tag>
+                );
             },
-            width: '10%',
         },
         {
-            title: 'Cost',
+            title: <span style={{ whiteSpace: 'nowrap' }}>Cost</span>,
             key: 'cost',
+            width: 140,
+            align: 'right' as const,
             render: (_: any, record: any) => {
                 const cost = resolveCost(record, settings);
                 if (!cost) return '-';
@@ -151,17 +224,17 @@ export default function HistoryPage() {
                                 : `Estimated using current rate: 1 USD = RM ${cost.exchangeRate.toFixed(2)}`
                         }
                     >
-                        <Text className="fw-medium" style={{ cursor: 'help' }}>
-                            RM{cost.costMyr.toFixed(2)}{' '}
-                            <Text type="secondary" style={{ fontSize: '13px' }}>
-                                (${cost.costUsd.toFixed(2)})
+                        <div style={{ whiteSpace: 'nowrap', cursor: 'help' }}>
+                            <Text className="fw-medium">
+                                RM{cost.costMyr.toFixed(2)}{' '}
+                                <Text type="secondary" style={{ fontSize: '13px' }}>
+                                    (${cost.costUsd.toFixed(2)})
+                                </Text>
                             </Text>
-                        </Text>
+                        </div>
                     </Tooltip>
                 );
             },
-            width: '15%',
-            align: 'right' as const,
         },
         {
             title: '',
@@ -221,7 +294,7 @@ export default function HistoryPage() {
                     </Dropdown>
                 );
             },
-            width: '5%',
+            width: 50,
             align: 'center' as const,
         }
     ];
@@ -229,11 +302,11 @@ export default function HistoryPage() {
     return (
         <div className="container-fluid bg-light d-flex flex-column flex-grow-1 py-4 pb-5">
             <div className="container animate__animated animate__fadeIn w-100" style={{ maxWidth: '1200px' }}>
-                <div className="mb-4">
-                    <Title level={2} className="mb-1" style={{ letterSpacing: "-0.5px" }}>Generation History</Title>
-                    <Text type="secondary" style={{ fontSize: "1.05rem" }}>
+                <div className="mt-3 mb-4">
+                    <h2 className="fw-bold mb-2">Generation History</h2>
+                    <p className="text-muted mb-0">
                         View all past generated documents and their associated AI pricing.
-                    </Text>
+                    </p>
                 </div>
 
                 <div className="bg-white rounded shadow-sm border p-4">
@@ -249,6 +322,7 @@ export default function HistoryPage() {
                             pagination={{ pageSize: 10, showSizeChanger: false }}
                             className="custom-table"
                             rowClassName={() => 'align-middle'}
+                            scroll={{ x: 'max-content' }}
                         />
                     )}
                 </div>

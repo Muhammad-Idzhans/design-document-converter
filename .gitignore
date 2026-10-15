@@ -5,6 +5,7 @@ python-backend-prod/outputs
 python-backend-test/outputs
 
 python-backend-dev/__pycache__
+python-backend-test/__pycache__
 python-backend-prod/__pycache__
 
 extraction-output

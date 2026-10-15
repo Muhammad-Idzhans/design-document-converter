@@ -27,27 +27,17 @@ const CurrencyInput = ({ value, onChange, prefix, addonBefore }: { value?: any, 
         onChange?.(numericValue);
     };
 
-    const inputNode = (
+    return (
         <Input
             size="large"
+            addonBefore={addonBefore}
             prefix={prefix}
             value={displayValue}
             onChange={handleChange}
             inputMode="numeric"
-            style={{ borderRadius: addonBefore ? undefined : "8px" }}
+            style={{ borderRadius: "8px" }}
         />
     );
-
-    if (addonBefore) {
-        return (
-            <Space.Compact block size="large">
-                <Space.Addon>{addonBefore}</Space.Addon>
-                {inputNode}
-            </Space.Compact>
-        );
-    }
-
-    return inputNode;
 };
 
 export default function SettingsPage() {
@@ -124,12 +114,12 @@ export default function SettingsPage() {
     return (
         <div className="container-fluid bg-light d-flex flex-column flex-grow-1 py-4 pb-5">
             <div className="container animate__animated animate__fadeIn w-100" style={{ maxWidth: '1200px' }}>
-                <div className="mb-4 d-flex justify-content-between align-items-end">
+                <div className="mt-3 mb-4 d-flex justify-content-between align-items-end flex-wrap gap-2">
                     <div>
-                        <Title level={2} className="mb-1" style={{ letterSpacing: "-0.5px" }}>Settings & Configurations</Title>
-                        <Text type="secondary" style={{ fontSize: "1.05rem" }}>
+                        <h2 className="fw-bold mb-2">Settings & Configurations</h2>
+                        <p className="text-muted mb-0">
                             Manage application parameters, AI model pricing, and conversion rates.
-                        </Text>
+                        </p>
                     </div>
                     {lastUpdated && (
                         <div className="text-muted small">
@@ -174,7 +164,7 @@ export default function SettingsPage() {
                                     className="mb-0"
                                 >
                                     <CurrencyInput
-                                        addonBefore={<span className="fw-medium px-1" style={{ color: "#555" }}>1 US Dollar =</span>}
+                                        addonBefore={<span className="fw-medium px-2" style={{ color: "#555", whiteSpace: "nowrap" }}>1 US Dollar =</span>}
                                         prefix={<span className="text-muted fw-medium me-1">RM</span>}
                                     />
                                 </Form.Item>

@@ -14,21 +14,25 @@ if (endpoint && key) {
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
     if (!client) {
         return NextResponse.json({ error: "Cosmos DB is not configured." }, { status: 500 });
     }
 
     try {
+        const { searchParams } = new URL(request.url);
+        const activeOnly = searchParams.get('active_only') === 'true';
+
         const database = client.database(databaseId);
         const container = database.container(containerId);
 
-        // Query all tasks and order by creation time descending (newest first)
-        const querySpec = {
-            query: "SELECT c.id, c.taskId, c.filename, c.generated_filename, c.documentType, c.createdAt, c.status, c.cost_metrics, c.cost_summary, c.blobPath, c.storage FROM c ORDER BY c.createdAt DESC"
-        };
+        let query = "SELECT c.id, c.taskId, c.filename, c.generated_filename, c.documentType, c.createdAt, c.status, c.cost_metrics, c.cost_summary, c.blobPath, c.storage, c.isDeleted, c.deletedAt FROM c";
+        if (activeOnly) {
+            query += " WHERE (NOT IS_DEFINED(c.isDeleted) OR c.isDeleted = false)";
+        }
+        query += " ORDER BY c.createdAt DESC";
 
-        const { resources: items } = await container.items.query(querySpec).fetchAll();
+        const { resources: items } = await container.items.query({ query }).fetchAll();
 
         return NextResponse.json({ data: items });
     } catch (error: any) {

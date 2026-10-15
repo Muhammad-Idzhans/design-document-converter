@@ -20,7 +20,7 @@ const menuItems: MenuItem[] = [
         key: '/dashboard',
         icon: <AppstoreOutlined />,
         label: 'Dashboard',
-        disabled: true,
+        disabled: false,
     },
     {
         key: '/generate',
@@ -36,7 +36,7 @@ const menuItems: MenuItem[] = [
             {
                 key: '/generate/final-config',
                 label: 'Final Configuration',
-                disabled: true,
+                disabled: false,
             },
         ],
     },
