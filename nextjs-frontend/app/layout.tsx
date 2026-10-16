@@ -13,8 +13,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Design Document Converter",
-  description: "Convert design slides (pptx) to Word Document (docx) using AI.",
+  title: "Enfrasys Document Generator",
+  description: "Convert design slides (pptx) to Word Document (docx) & Final Configuration (HTML) using AI.",
 };
 
 export default function RootLayout({
