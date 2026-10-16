@@ -635,7 +635,8 @@ export default function FinalConfigPage() {
   };
 
   // ─── Gate: must be logged into the app (Enfrasys) first ────────────────────
-  const appLoggedIn = status === "authenticated" && !!session;
+  const isAuthDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === "true";
+  const appLoggedIn = isAuthDisabled || (status === "authenticated" && !!session);
 
   return (
     <div className="container-fluid bg-light d-flex flex-column flex-grow-1 align-items-center py-4 pb-5">
