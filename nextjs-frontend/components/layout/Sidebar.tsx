@@ -36,7 +36,7 @@ const menuItems: MenuItem[] = [
             {
                 key: '/generate/final-config',
                 label: 'Final Configuration',
-                disabled: true,
+                disabled: false,
             },
         ],
     },

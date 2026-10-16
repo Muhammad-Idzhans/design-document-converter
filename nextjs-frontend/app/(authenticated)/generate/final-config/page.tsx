@@ -35,6 +35,18 @@ function updateTreeData(list: TreeDataNode[], key: React.Key, children: TreeData
   });
 }
 
+// Helper to find a specific node in the tree by its key
+function findNode(nodes: TreeDataNode[], key: React.Key): TreeDataNode | null {
+  for (const node of nodes) {
+    if (node.key === key) return node;
+    if (node.children) {
+      const found = findNode(node.children, key);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 // ─── Helper: count all leaf nodes under a tree ───────────────────────────────
 function countLeaves(nodes: TreeDataNode[]): number {
   let count = 0;
@@ -88,6 +100,7 @@ export default function FinalConfigPage() {
 
   const [treeData, setTreeData] = useState<TreeDataNode[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(false);
+  const [loadingTree, setLoadingTree] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [checkedKeys, setCheckedKeys] = useState<React.Key[]>([]);
@@ -430,6 +443,197 @@ export default function FinalConfigPage() {
   // Only show the form sections when the connected tenant has at least one subscription
   const hasSubscriptions = treeData.length > 0;
 
+  // ─── Recursive Check/Uncheck handler for Subscriptions, RGs & Resources ───
+  const handleCheck = async (keys: any, e: any) => {
+    const isChecked = e.checked;
+    const nodeKey = String(e.node.key);
+    const isSubscription = !nodeKey.includes("|") && !nodeKey.toLowerCase().startsWith("/subscriptions");
+    const isResourceGroup = nodeKey.includes("|") && !nodeKey.toLowerCase().startsWith("/subscriptions");
+    const isResource = nodeKey.toLowerCase().startsWith("/subscriptions");
+
+    // ─── UNCHECK LOGIC ────────────────────────────────────────────────────────
+    if (!isChecked) {
+      if (isSubscription) {
+        const subIdLower = nodeKey.toLowerCase();
+        setCheckedKeys((prev) =>
+          prev.filter((k) => {
+            const kStr = String(k).toLowerCase();
+            if (kStr === subIdLower) return false;
+            if (kStr.startsWith(`${subIdLower}|`)) return false;
+            if (kStr.startsWith(`/subscriptions/${subIdLower}/`)) return false;
+            return true;
+          })
+        );
+        return;
+      }
+
+      if (isResourceGroup) {
+        const [subId, rgName] = nodeKey.split("|");
+        const subIdLower = subId.toLowerCase();
+        const rgKeyLower = nodeKey.toLowerCase();
+        const rgPrefix = `/subscriptions/${subIdLower}/resourcegroups/${rgName.toLowerCase()}/`;
+        setCheckedKeys((prev) =>
+          prev.filter((k) => {
+            const kStr = String(k).toLowerCase();
+            if (kStr === subIdLower) return false; // uncheck parent subscription
+            if (kStr === rgKeyLower) return false;
+            if (kStr.startsWith(rgPrefix)) return false;
+            return true;
+          })
+        );
+        return;
+      }
+
+      if (isResource) {
+        const match = nodeKey.match(/\/subscriptions\/([^/]+)\/resourcegroups\/([^/]+)/i);
+        if (match) {
+          const subIdLower = match[1].toLowerCase();
+          const rgKeyLower = `${match[1]}|${match[2]}`.toLowerCase();
+          setCheckedKeys((prev) =>
+            prev.filter((k) => {
+              const kStr = String(k).toLowerCase();
+              if (kStr === nodeKey.toLowerCase()) return false;
+              if (kStr === subIdLower) return false;
+              if (kStr === rgKeyLower) return false;
+              return true;
+            })
+          );
+        } else {
+          setCheckedKeys((prev) => prev.filter((k) => String(k).toLowerCase() !== nodeKey.toLowerCase()));
+        }
+        return;
+      }
+    }
+
+    // ─── CHECK LOGIC ──────────────────────────────────────────────────────────
+    if (isChecked) {
+      // 1. Ticking a Subscription
+      if (isSubscription) {
+        setLoadingTree(true);
+        try {
+          const subId = nodeKey;
+          let currentSubNode = findNode(treeData, subId);
+          let rgNodes: TreeDataNode[] = [];
+
+          // 1a. Ensure RGs exist for this subscription
+          if (currentSubNode && currentSubNode.children && currentSubNode.children.length > 0) {
+            rgNodes = currentSubNode.children;
+          } else {
+            const res = await fetch(`${API_BASE_URL}/api/azure/subscriptions/${subId}/resourcegroups`, {
+              headers: { Authorization: `Bearer ${armToken}` },
+            });
+            if (res.ok) {
+              const data = await res.json();
+              rgNodes = data.map((rg: any) => ({
+                title: rg.name,
+                key: `${subId}|${rg.name}`,
+                icon: <FolderOutlined style={{ color: "#722ed1" }} />,
+                isLeaf: false,
+                children: undefined,
+              }));
+            }
+          }
+
+          // 1b. For every RG, load its resources if not already loaded
+          const allRgKeys: React.Key[] = rgNodes.map((rg) => rg.key);
+          const allResourceKeys: React.Key[] = [];
+
+          const updatedRgNodes = await Promise.all(
+            rgNodes.map(async (rgNode) => {
+              if (rgNode.children && rgNode.children.length > 0) {
+                rgNode.children.forEach((c) => allResourceKeys.push(c.key));
+                return rgNode;
+              }
+
+              const [sId, rgName] = String(rgNode.key).split("|");
+              try {
+                const res = await fetch(
+                  `${API_BASE_URL}/api/azure/subscriptions/${sId}/resourcegroups/${rgName}/resources`,
+                  { headers: { Authorization: `Bearer ${armToken}` } }
+                );
+                if (res.ok) {
+                  const data = await res.json();
+                  const resourceNodes: TreeDataNode[] = data.map((r: any) => ({
+                    title: `${r.name} (${r.type.split("/").pop()})`,
+                    key: r.id,
+                    icon: <AppstoreOutlined style={{ color: "#52c41a" }} />,
+                    isLeaf: true,
+                  }));
+                  resourceNodes.forEach((r) => allResourceKeys.push(r.key));
+                  return { ...rgNode, children: resourceNodes };
+                }
+              } catch (err) {
+                console.error(`Failed to load resources for ${rgName}:`, err);
+              }
+              return { ...rgNode, children: [] };
+            })
+          );
+
+          // 1c. Update treeData with the complete hierarchy
+          setTreeData((origin) => updateTreeData(origin, subId, updatedRgNodes));
+
+          // 1d. Expand subscription AND all RGs down to the resource level
+          setExpandedKeys((prev) => Array.from(new Set([...prev, subId, ...allRgKeys])));
+
+          // 1e. Check subscription, all RGs, and all Resources
+          setCheckedKeys((prev) => Array.from(new Set([...prev, subId, ...allRgKeys, ...allResourceKeys])));
+        } catch (err) {
+          console.error("Error loading subscription resources:", err);
+        } finally {
+          setLoadingTree(false);
+        }
+        return;
+      }
+
+      // 2. Ticking a Resource Group
+      if (isResourceGroup) {
+        setLoadingTree(true);
+        try {
+          const [subId, rgName] = nodeKey.split("|");
+          let currentRgNode = findNode(treeData, nodeKey);
+          const resourceKeys: React.Key[] = [];
+
+          if (currentRgNode && currentRgNode.children && currentRgNode.children.length > 0) {
+            currentRgNode.children.forEach((c) => resourceKeys.push(c.key));
+          } else {
+            const res = await fetch(
+              `${API_BASE_URL}/api/azure/subscriptions/${subId}/resourcegroups/${rgName}/resources`,
+              { headers: { Authorization: `Bearer ${armToken}` } }
+            );
+            if (res.ok) {
+              const data = await res.json();
+              const resourceNodes: TreeDataNode[] = data.map((r: any) => ({
+                title: `${r.name} (${r.type.split("/").pop()})`,
+                key: r.id,
+                icon: <AppstoreOutlined style={{ color: "#52c41a" }} />,
+                isLeaf: true,
+              }));
+              resourceNodes.forEach((r) => resourceKeys.push(r.key));
+              setTreeData((origin) => updateTreeData(origin, nodeKey, resourceNodes));
+            }
+          }
+
+          // Expand this RG
+          setExpandedKeys((prev) => Array.from(new Set([...prev, nodeKey])));
+
+          // Check this RG and its resources
+          setCheckedKeys((prev) => Array.from(new Set([...prev, nodeKey, ...resourceKeys])));
+        } catch (err) {
+          console.error("Error loading RG resources:", err);
+        } finally {
+          setLoadingTree(false);
+        }
+        return;
+      }
+
+      // 3. Ticking an individual Resource
+      if (isResource) {
+        setCheckedKeys((prev) => Array.from(new Set([...prev, nodeKey])));
+        return;
+      }
+    }
+  };
+
   // ─── Gate: must be logged into the app (Enfrasys) first ────────────────────
   const appLoggedIn = status === "authenticated" && !!session;
 
@@ -617,50 +821,20 @@ export default function FinalConfigPage() {
                   <Spin tip="Loading Subscriptions..." size="large" />
                 </div>
               ) : filteredTreeData.length > 0 ? (
-                <Tree
-                  checkable
-                  showIcon
-                  selectable={false}
-                  loadData={onLoadData}
-                  treeData={filteredTreeData}
-                  checkedKeys={checkedKeys}
-                  expandedKeys={expandedKeys}
-                  onExpand={(keys) => setExpandedKeys(keys)}
-                  onCheck={async (keys, e: any) => {
-                    let currentChecked = Array.isArray(keys) ? keys : keys.checked;
-                    setCheckedKeys(currentChecked);
-
-                    if (e.checked && !e.node.isLeaf && (!e.node.children || e.node.children.length === 0)) {
-                      setExpandedKeys((prev) => Array.from(new Set([...prev, e.node.key])));
-
-                      const loadedKeys = await onLoadData(e.node);
-                      if (loadedKeys && loadedKeys.length > 0) {
-                        setCheckedKeys((prev) => Array.from(new Set([...prev, ...loadedKeys])));
-
-                        // If it's a Subscription, we just loaded RGs. Now recursively load resources for these RGs.
-                        const isSubscription = String(e.node.key).indexOf("|") === -1;
-                        if (isSubscription) {
-                          let allResourceKeys: React.Key[] = [];
-                          setExpandedKeys((prev) => Array.from(new Set([...prev, ...loadedKeys])));
-
-                          const promises = loadedKeys.map((rgKey) =>
-                            onLoadData({ key: rgKey, children: undefined })
-                          );
-
-                          const results = await Promise.all(promises);
-                          results.forEach((resKeys) => {
-                            if (resKeys) allResourceKeys.push(...resKeys);
-                          });
-
-                          if (allResourceKeys.length > 0) {
-                            setCheckedKeys((prev) => Array.from(new Set([...prev, ...allResourceKeys])));
-                          }
-                        }
-                      }
-                    }
-                  }}
-                  style={{ fontSize: "13.5px" }}
-                />
+                <Spin spinning={loadingTree} tip="Loading Azure resources...">
+                  <Tree
+                    checkable
+                    showIcon
+                    selectable={false}
+                    loadData={onLoadData}
+                    treeData={filteredTreeData}
+                    checkedKeys={checkedKeys}
+                    expandedKeys={expandedKeys}
+                    onExpand={(keys) => setExpandedKeys(keys)}
+                    onCheck={handleCheck}
+                    style={{ fontSize: "13.5px" }}
+                  />
+                </Spin>
               ) : (
                 <Empty
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
